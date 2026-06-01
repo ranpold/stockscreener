@@ -25,15 +25,15 @@ function FilterInput({
   placeholder?: string;
 }) {
   return (
-    <label className="flex flex-col gap-1 text-xs text-muted">
-      {label}
+    <label className="flex flex-col gap-1.5">
+      <span className="text-[11px] font-medium text-muted uppercase tracking-wide">{label}</span>
       <input
         type="number"
         step={step}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className="w-24 bg-panel2 border border-edge rounded px-2 py-1 text-ink text-sm focus:border-accent outline-none"
+        className="w-full bg-bg border border-edge rounded-lg px-3 py-2 text-ink text-sm placeholder:text-muted/50 focus:border-accent focus:ring-1 focus:ring-accent/40 outline-none transition"
       />
     </label>
   );
@@ -114,14 +114,14 @@ export default function Screener() {
         <SearchBox />
       </div>
 
-      <div className="bg-panel border border-edge rounded-lg p-4 space-y-4">
-        <div className="flex flex-wrap items-end gap-4">
-          <label className="flex flex-col gap-1 text-xs text-muted">
-            Universe
+      <div className="bg-panel border border-edge rounded-xl overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-edge">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm font-semibold">Screen</span>
             <select
               value={universe}
               onChange={(e) => setUniverse(e.target.value)}
-              className="bg-panel2 border border-edge rounded px-2 py-1.5 text-ink text-sm focus:border-accent outline-none"
+              className="bg-bg border border-edge rounded-lg px-3 py-2 text-ink text-sm focus:border-accent focus:ring-1 focus:ring-accent/40 outline-none transition"
             >
               <option value="sp500">S&P 500 (sample)</option>
               <option value="custom">Custom tickers</option>
@@ -131,33 +131,34 @@ export default function Screener() {
                 </option>
               ))}
             </select>
-          </label>
-          {universe === "custom" && (
-            <label className="flex flex-col gap-1 text-xs text-muted flex-1 min-w-[220px]">
-              Tickers (comma-separated)
+            {universe === "custom" && (
               <input
                 value={custom}
                 onChange={(e) => setCustom(e.target.value)}
                 placeholder="AAPL, MSFT, NVDA"
-                className="bg-panel2 border border-edge rounded px-2 py-1.5 text-ink text-sm focus:border-accent outline-none"
+                className="bg-bg border border-edge rounded-lg px-3 py-2 text-ink text-sm w-56 placeholder:text-muted/50 focus:border-accent focus:ring-1 focus:ring-accent/40 outline-none transition"
               />
-            </label>
-          )}
+            )}
+          </div>
+          <button
+            onClick={run}
+            disabled={query.isFetching}
+            className="bg-accent hover:brightness-110 disabled:opacity-50 text-white text-sm font-semibold px-6 py-2 rounded-lg transition shrink-0"
+          >
+            {query.isFetching ? "Running…" : "Run screen"}
+          </button>
         </div>
 
-        <div className="flex flex-wrap gap-4">
-          <FilterInput label="Min Sharpe" value={filters.minSharpe ?? ""} onChange={(v) => setFilters((f) => ({ ...f, minSharpe: v }))} placeholder="e.g. 1" />
-          <FilterInput label="Max P/E" value={filters.maxPe ?? ""} onChange={(v) => setFilters((f) => ({ ...f, maxPe: v }))} step="1" placeholder="e.g. 30" />
-          <FilterInput label="Min ROE" value={filters.minRoe ?? ""} onChange={(v) => setFilters((f) => ({ ...f, minRoe: v }))} step="0.05" placeholder="0.15" />
-          <FilterInput label="Min Momentum" value={filters.minMomentum ?? ""} onChange={(v) => setFilters((f) => ({ ...f, minMomentum: v }))} step="0.05" placeholder="0.1" />
-          <FilterInput label="Max Beta" value={filters.maxBeta ?? ""} onChange={(v) => setFilters((f) => ({ ...f, maxBeta: v }))} placeholder="1.5" />
-          <div className="flex items-end">
-            <button
-              onClick={run}
-              className="bg-accent hover:brightness-110 text-white text-sm font-medium px-5 py-2 rounded transition"
-            >
-              Run screen
-            </button>
+        <div className="px-5 py-4">
+          <div className="text-[11px] font-medium text-muted uppercase tracking-wide mb-3">
+            Filters <span className="text-muted/60 normal-case">· optional</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <FilterInput label="Min Sharpe" value={filters.minSharpe ?? ""} onChange={(v) => setFilters((f) => ({ ...f, minSharpe: v }))} placeholder="e.g. 1" />
+            <FilterInput label="Max P/E" value={filters.maxPe ?? ""} onChange={(v) => setFilters((f) => ({ ...f, maxPe: v }))} step="1" placeholder="e.g. 30" />
+            <FilterInput label="Min ROE" value={filters.minRoe ?? ""} onChange={(v) => setFilters((f) => ({ ...f, minRoe: v }))} step="0.05" placeholder="0.15" />
+            <FilterInput label="Min Momentum" value={filters.minMomentum ?? ""} onChange={(v) => setFilters((f) => ({ ...f, minMomentum: v }))} step="0.05" placeholder="0.1" />
+            <FilterInput label="Max Beta" value={filters.maxBeta ?? ""} onChange={(v) => setFilters((f) => ({ ...f, maxBeta: v }))} placeholder="1.5" />
           </div>
         </div>
       </div>

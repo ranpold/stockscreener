@@ -60,13 +60,13 @@ export default function StockDetail() {
 
   return (
     <div className="space-y-5">
-      <Link to="/" className="text-accent text-sm">← Screener</Link>
+      <Link to="/" className="text-accent text-sm">← Back</Link>
 
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            {data.ticker}
-            <span className="text-muted font-normal text-lg">{data.name}</span>
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span>{data.ticker}</span>
+            <span className="text-muted font-normal text-base sm:text-lg">{data.name}</span>
             {data.isEtf && (
               <span className="text-[11px] bg-edge px-2 py-0.5 rounded text-muted font-normal">ETF</span>
             )}
@@ -74,8 +74,8 @@ export default function StockDetail() {
           {data.sector && <div className="text-muted text-sm">{data.sector}</div>}
         </div>
         {q && (
-          <div className="text-right">
-            <div className="text-2xl font-semibold tabular-nums">{fmt.money(q.price)}</div>
+          <div className="text-right shrink-0">
+            <div className="text-xl sm:text-2xl font-semibold tabular-nums">{fmt.money(q.price)}</div>
             <div className={`text-sm tabular-nums ${q.change >= 0 ? "text-pos" : "text-neg"}`}>
               {q.change >= 0 ? "+" : ""}
               {fmt.num(q.change)} ({fmt.pct(q.changePercent)})
@@ -103,7 +103,7 @@ export default function StockDetail() {
         <PriceChart bars={data.ohlcv} />
       </div>
 
-      <div className="flex gap-1 border-b border-edge">
+      <div className="flex gap-1 border-b border-edge overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
         {([
           ["risk", "Risk & Return"],
           ["technical", "Technical"],
@@ -113,7 +113,7 @@ export default function StockDetail() {
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${
+            className={`px-3 sm:px-4 py-2 text-sm font-medium border-b-2 -mb-px transition whitespace-nowrap shrink-0 ${
               tab === key ? "border-accent text-ink" : "border-transparent text-muted hover:text-ink"
             }`}
           >

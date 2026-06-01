@@ -50,7 +50,7 @@ export default function RecommendationPanel({ rec, isEtf }: { rec: Recommendatio
             Composite quant signal {isEtf ? "(ETF: price & risk weighted)" : "(value · quality · momentum · trend · risk)"}
           </div>
         </div>
-        <div className="flex-1 min-w-[240px] space-y-1.5">
+        <div className="flex-1 min-w-full sm:min-w-[240px] space-y-1.5">
           {rec.subScores.map((s) => (
             <Bar key={s.key} label={s.label} score={s.weight === 0 ? null : s.score} />
           ))}

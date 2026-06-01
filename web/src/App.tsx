@@ -20,11 +20,11 @@ function Nav() {
   };
   return (
     <header className="border-b border-edge bg-panel">
-      <div className="max-w-7xl mx-auto px-5 h-14 flex items-center gap-4">
-        <Link to="/" className="font-bold text-ink tracking-tight">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-2 sm:gap-4">
+        <Link to="/" className="font-bold text-ink tracking-tight shrink-0">
           <span className="text-accent">◆</span> QuantScreen
         </Link>
-        <nav className="flex gap-1 ml-2">
+        <nav className="flex gap-1 sm:ml-2">
           {link("/", "Search")}
           {link("/watchlists", "Watchlists")}
         </nav>
@@ -37,7 +37,7 @@ export default function App() {
   return (
     <div className="min-h-full">
       <Nav />
-      <main className="max-w-7xl mx-auto px-5 py-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-6">
         <Routes>
           <Route path="/" element={<Screener />} />
           <Route path="/stock/:ticker" element={<StockDetail />} />

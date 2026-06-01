@@ -23,3 +23,12 @@ body {
   background: #2a3346;
   border-radius: 6px;
 }
+
+/* Horizontal scroll without a visible scrollbar (e.g. mobile tab strips). */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

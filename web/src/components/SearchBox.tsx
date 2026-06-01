@@ -10,10 +10,12 @@ export default function SearchBox() {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const boxRef = useRef<HTMLDivElement>(null);
 
   // Debounced search.
   useEffect(() => {
+    setError("");
     const term = q.trim();
     if (term.length < 1) {
       setResults([]);
@@ -48,6 +50,25 @@ export default function SearchBox() {
     navigate(`/stock/${symbol.toUpperCase()}`);
   };
 
+  // Resolve the current text to a real symbol via search, then navigate.
+  // Never navigates to raw typed text (avoids "/stock/APPLE" 404s).
+  const submit = async () => {
+    const term = q.trim();
+    if (!term) return;
+    if (results[active]) return go(results[active].symbol);
+    setLoading(true);
+    setError("");
+    try {
+      const list = results.length ? results : (await api.search(term)).results;
+      if (list.length) go(list[0].symbol);
+      else setError(`No match for "${term}". Try a company name or ticker.`);
+    } catch {
+      setError("Search failed — try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -56,8 +77,8 @@ export default function SearchBox() {
       e.preventDefault();
       setActive((a) => Math.max(a - 1, 0));
     } else if (e.key === "Enter") {
-      if (results[active]) go(results[active].symbol);
-      else if (q.trim()) go(q.trim());
+      e.preventDefault();
+      void submit();
     } else if (e.key === "Escape") {
       setOpen(false);
     }
@@ -78,12 +99,13 @@ export default function SearchBox() {
           className="flex-1 bg-panel2 border border-edge rounded px-3 py-2 text-ink text-sm focus:border-accent outline-none"
         />
         <button
-          onClick={() => (results[0] ? go(results[0].symbol) : q.trim() && go(q.trim()))}
+          onClick={() => void submit()}
           className="bg-accent hover:brightness-110 text-white text-sm font-medium px-5 py-2 rounded transition"
         >
           Analyze →
         </button>
       </div>
+      {error && <div className="text-neg text-xs mt-1">{error}</div>}
 
       {open && (results.length > 0 || loading) && (
         <div className="absolute z-20 mt-1 w-full bg-panel2 border border-edge rounded-lg shadow-xl overflow-hidden">

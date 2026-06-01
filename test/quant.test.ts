@@ -173,3 +173,57 @@ describe("factor", () => {
     expect(bt.excessReturn).toBeGreaterThan(0);
   });
 });
+
+import { recommend, type RecommendationInput } from "../src/quant/recommendation";
+
+const baseRec: RecommendationInput = {
+  isEtf: false,
+  sharpe: 1.2, sortino: 1.5, maxDrawdown: -0.2, cagr: 0.15,
+  lastClose: 100, sma50: 95, sma200: 90, rsi14: 55,
+  macd: 1, macdSignal: 0.5, momentum12_1: 0.2,
+  pe: 18, pb: 3, roe: 0.22, netMargin: 0.2, piotroski: 8,
+};
+
+describe("recommendation", () => {
+  it("strong company scores high and recommends buy", () => {
+    const r = recommend(baseRec);
+    expect(r.score).toBeGreaterThan(60);
+    expect(["Strong Buy", "Buy"]).toContain(r.verdict);
+    expect(r.positives.length).toBeGreaterThan(0);
+    expect(r.disclaimer).toMatch(/not financial advice/i);
+  });
+
+  it("weak company scores low", () => {
+    const r = recommend({
+      ...baseRec,
+      sharpe: -0.5, sortino: -0.4, maxDrawdown: -0.55,
+      lastClose: 80, sma50: 95, sma200: 110, macd: -1, macdSignal: 0.2, momentum12_1: -0.25,
+      pe: 60, pb: 11, roe: 0.01, netMargin: 0.01, piotroski: 2,
+    });
+    expect(r.score).toBeLessThan(40);
+    expect(["Reduce", "Avoid"]).toContain(r.verdict);
+    expect(r.negatives.length).toBeGreaterThan(0);
+  });
+
+  it("ETF excludes value/quality and still scores", () => {
+    const r = recommend({ ...baseRec, isEtf: true, pe: null, pb: null, roe: null, netMargin: null, piotroski: null });
+    const value = r.subScores.find((s) => s.key === "value")!;
+    expect(value.score).toBeNull();
+    expect(value.weight).toBe(0);
+    expect(r.score).toBeGreaterThan(0);
+    expect(r.score).toBeLessThanOrEqual(100);
+  });
+
+  it("overbought RSI adds a negative and dents score", () => {
+    const hot = recommend({ ...baseRec, rsi14: 82 });
+    const calm = recommend({ ...baseRec, rsi14: 55 });
+    expect(hot.score).toBeLessThan(calm.score);
+    expect(hot.negatives.join(" ")).toMatch(/overbought/i);
+  });
+
+  it("score always within 0..100", () => {
+    const r = recommend({ ...baseRec, sharpe: 99, sortino: 99, momentum12_1: 99 });
+    expect(r.score).toBeLessThanOrEqual(100);
+    expect(r.score).toBeGreaterThanOrEqual(0);
+  });
+});

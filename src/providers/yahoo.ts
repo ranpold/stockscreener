@@ -56,6 +56,7 @@ export const yahooProvider: DataProvider = {
       change: price - prev,
       changePercent: prev ? (price - prev) / prev : 0,
       name: meta.shortName ?? meta.longName,
+      instrumentType: meta.instrumentType,
     };
   },
 

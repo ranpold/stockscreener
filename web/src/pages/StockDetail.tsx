@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, fmt, type StockAnalysis } from "../api";
 import PriceChart from "../components/PriceChart";
 import MetricCard from "../components/MetricCard";
+import RecommendationPanel from "../components/RecommendationPanel";
 
 type Tab = "risk" | "technical" | "valuation" | "factor";
 
@@ -38,8 +39,12 @@ export default function StockDetail() {
 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">
-            {data.ticker} <span className="text-muted font-normal text-lg">{data.name}</span>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            {data.ticker}
+            <span className="text-muted font-normal text-lg">{data.name}</span>
+            {data.isEtf && (
+              <span className="text-[11px] bg-edge px-2 py-0.5 rounded text-muted font-normal">ETF</span>
+            )}
           </h1>
           {data.sector && <div className="text-muted text-sm">{data.sector}</div>}
         </div>
@@ -53,6 +58,8 @@ export default function StockDetail() {
           </div>
         )}
       </div>
+
+      <RecommendationPanel rec={data.recommendation} isEtf={data.isEtf} />
 
       <div className="bg-panel border border-edge rounded-lg p-4">
         <div className="flex justify-end gap-1 mb-2">
@@ -122,6 +129,13 @@ export default function StockDetail() {
         </div>
       )}
 
+      {tab === "valuation" && data.isEtf && (
+        <div className="text-muted text-sm bg-panel2 border border-edge rounded-lg p-3 mb-3">
+          This is an ETF — single-company valuation ratios (P/E, ROE, Piotroski) don't apply to a fund
+          the way they do to a stock. The recommendation above weights price trend and risk-adjusted
+          return instead. Any values shown below are fund-level approximations and may be blank.
+        </div>
+      )}
       {tab === "valuation" && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           <MetricCard label="P/E" value={fmt.num(data.fundamental.pe, 1)} />
@@ -150,6 +164,39 @@ export default function StockDetail() {
           </div>
         </div>
       )}
+
+      <div>
+        <h2 className="text-lg font-bold mb-2">Latest news</h2>
+        {data.news.length === 0 ? (
+          <div className="text-muted text-sm bg-panel border border-edge rounded-lg p-4">
+            No recent headlines found for {data.ticker}.
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 gap-3">
+            {data.news.map((n, i) => (
+              <a
+                key={i}
+                href={n.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-panel border border-edge rounded-lg p-3 hover:border-accent transition flex gap-3"
+              >
+                {n.image && (
+                  <img src={n.image} alt="" className="w-20 h-20 object-cover rounded shrink-0" loading="lazy" />
+                )}
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-ink line-clamp-2">{n.headline}</div>
+                  <div className="text-[11px] text-muted mt-1">
+                    {n.source}
+                    {n.datetime ? ` · ${new Date(n.datetime * 1000).toLocaleDateString()}` : ""}
+                  </div>
+                  {n.summary && <div className="text-xs text-muted mt-1 line-clamp-2">{n.summary}</div>}
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -16,6 +16,7 @@ export interface Quote {
   changePercent: number;
   marketCap?: number;
   name?: string;
+  instrumentType?: string; // "EQUITY" | "ETF" | ...
 }
 
 export interface Profile {

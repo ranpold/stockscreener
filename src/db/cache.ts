@@ -49,4 +49,5 @@ export const TTL = {
   fundamentals: 86400, // 24 h
   profile: 604800, // 7 d
   screen: 3600, // 1 h
+  news: 3600, // 1 h
 };

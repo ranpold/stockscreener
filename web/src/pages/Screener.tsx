@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, fmt, type ScreenRow, type ScreenFilters, type Watchlist } from "../api";
+import SearchBox from "../components/SearchBox";
 
 type SortKey = keyof Pick<
   ScreenRow,
@@ -43,7 +44,6 @@ export default function Screener() {
   const [searchParams] = useSearchParams();
   const [universe, setUniverse] = useState(searchParams.get("universe") || "sp500");
   const [custom, setCustom] = useState("");
-  const [analyze, setAnalyze] = useState("");
   const [filters, setFilters] = useState<Record<string, string>>({});
   // Auto-run the screen when arriving via a "Screen this →" link (?universe=...).
   const [submitted, setSubmitted] = useState<{ universe: string; filters: ScreenFilters } | null>(
@@ -111,24 +111,7 @@ export default function Screener() {
       </div>
 
       <div className="bg-panel border border-edge rounded-lg p-4">
-        <div className="text-xs text-muted mb-1">Analyze any ticker — full risk / technical / valuation / factor breakdown</div>
-        <div className="flex gap-2">
-          <input
-            value={analyze}
-            onChange={(e) => setAnalyze(e.target.value.toUpperCase())}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && analyze.trim()) navigate(`/stock/${analyze.trim()}`);
-            }}
-            placeholder="e.g. AAPL"
-            className="flex-1 bg-panel2 border border-edge rounded px-3 py-2 text-ink text-sm focus:border-accent outline-none"
-          />
-          <button
-            onClick={() => analyze.trim() && navigate(`/stock/${analyze.trim()}`)}
-            className="bg-accent hover:brightness-110 text-white text-sm font-medium px-5 py-2 rounded transition"
-          >
-            Analyze →
-          </button>
-        </div>
+        <SearchBox />
       </div>
 
       <div className="bg-panel border border-edge rounded-lg p-4 space-y-4">

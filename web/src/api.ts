@@ -72,14 +72,49 @@ export interface FundamentalMetrics {
   piotroski: number | null;
 }
 
+export interface SubScore {
+  key: string;
+  label: string;
+  score: number | null;
+  weight: number;
+}
+
+export interface Recommendation {
+  score: number;
+  verdict: "Strong Buy" | "Buy" | "Hold" | "Reduce" | "Avoid";
+  subScores: SubScore[];
+  positives: string[];
+  negatives: string[];
+  disclaimer: string;
+}
+
+export interface NewsItem {
+  headline: string;
+  source: string;
+  url: string;
+  datetime: number;
+  summary?: string;
+  image?: string;
+}
+
+export interface SearchResult {
+  symbol: string;
+  name: string;
+  exchange?: string;
+  type?: string;
+}
+
 export interface StockAnalysis {
   ticker: string;
   name: string;
   sector?: string;
+  isEtf: boolean;
   quote: { price: number; change: number; changePercent: number } | null;
   risk: RiskMetrics;
   technical: TechnicalSnapshot;
   fundamental: FundamentalMetrics;
+  recommendation: Recommendation;
+  news: NewsItem[];
   ohlcv: OHLCVBar[];
 }
 
@@ -115,6 +150,10 @@ export const api = {
 
   stock(ticker: string, range = "1y"): Promise<StockAnalysis> {
     return getJson(`/api/stock/${encodeURIComponent(ticker)}?range=${range}`);
+  },
+
+  search(q: string): Promise<{ results: SearchResult[] }> {
+    return getJson(`/api/search?q=${encodeURIComponent(q)}`);
   },
 
   universe(): Promise<{ sp500: string[] }> {

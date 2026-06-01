@@ -4,6 +4,7 @@ import { getDb, ensureSchema } from "./db/client";
 import { buildStockAnalysis, buildScreen, type Env, type ScreenFilters } from "./service";
 import { SP500 } from "./universe/sp500";
 import { watchlistRoutes } from "./routes/watchlists";
+import { searchSymbols } from "./providers/search";
 import type { Range } from "./providers";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -13,6 +14,18 @@ app.use("/api/*", cors());
 app.get("/api/health", (c) => c.json({ ok: true, time: Date.now() }));
 
 app.get("/api/universe", (c) => c.json({ sp500: SP500 }));
+
+// Search symbols by company name or ticker (stocks + ETFs).
+app.get("/api/search", async (c) => {
+  const q = c.req.query("q") ?? "";
+  if (q.trim().length < 1) return c.json({ results: [] });
+  try {
+    const results = await searchSymbols(q, c.env);
+    return c.json({ results });
+  } catch (e) {
+    return c.json({ error: String(e), results: [] }, 500);
+  }
+});
 
 // Deep-dive analysis for one ticker.
 app.get("/api/stock/:ticker", async (c) => {

@@ -1,0 +1,4 @@
+TURSO_URL=libsql://your-db.turso.io
+TURSO_AUTH_TOKEN=your-turso-token
+FINNHUB_API_KEY=optional-finnhub-key
+FMP_API_KEY=optional-fmp-key

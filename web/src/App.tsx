@@ -25,7 +25,7 @@ function Nav() {
           <span className="text-accent">◆</span> QuantScreen
         </Link>
         <nav className="flex gap-1 ml-2">
-          {link("/", "Screener")}
+          {link("/", "Search")}
           {link("/watchlists", "Watchlists")}
         </nav>
       </div>

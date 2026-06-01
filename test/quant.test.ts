@@ -215,10 +215,17 @@ describe("recommendation", () => {
   });
 
   it("overbought RSI adds a negative and dents score", () => {
-    const hot = recommend({ ...baseRec, rsi14: 82 });
+    const hot = recommend({ ...baseRec, rsi14: 85 });
     const calm = recommend({ ...baseRec, rsi14: 55 });
     expect(hot.score).toBeLessThan(calm.score);
     expect(hot.negatives.join(" ")).toMatch(/overbought/i);
+  });
+
+  it("strong momentum in an uptrend gets a kicker and reads as a positive", () => {
+    const hot = recommend({ ...baseRec, momentum12_1: 0.8, sma200: 50, lastClose: 100 });
+    expect(hot.positives.join(" ")).toMatch(/strong momentum/i);
+    const flat = recommend({ ...baseRec, momentum12_1: 0.1 });
+    expect(hot.score).toBeGreaterThanOrEqual(flat.score);
   });
 
   it("score always within 0..100", () => {

@@ -117,10 +117,11 @@ export function recommend(input: RecommendationInput): Recommendation {
   const trend = trendScore(input.lastClose, input.sma50, input.sma200, input.macd, input.macdSignal);
   const risk = riskScore(input.sharpe, input.sortino, input.maxDrawdown);
 
-  // Weights — equity vs ETF (ETF leans on price/risk signals).
+  // Weights — momentum/trend (price action) carry more so strong performers are
+  // rewarded. ETFs drop value/quality and lean even harder on momentum.
   const weights = input.isEtf
-    ? { value: 0, quality: 0, momentum: 0.3, trend: 0.25, risk: 0.45 }
-    : { value: 0.2, quality: 0.2, momentum: 0.15, trend: 0.15, risk: 0.3 };
+    ? { value: 0, quality: 0, momentum: 0.4, trend: 0.3, risk: 0.3 }
+    : { value: 0.12, quality: 0.18, momentum: 0.27, trend: 0.21, risk: 0.22 };
 
   const subScores: SubScore[] = [
     { key: "value", label: "Valuation", score: value, weight: weights.value },
@@ -141,13 +142,23 @@ export function recommend(input: RecommendationInput): Recommendation {
   }
   let composite = wsum > 0 ? acc / wsum : 50;
 
-  // Overbought guard.
   const positives: string[] = [];
   const negatives: string[] = [];
+
+  // Momentum kicker: reward strong, confirmed uptrends so leaders get a Buy, not Hold.
+  // Triggers on big 12-1 momentum while price holds above its 200-day average.
+  const aboveLong = input.sma200 !== null && input.lastClose > input.sma200;
+  if (input.momentum12_1 >= 0.4 && (aboveLong || input.sma200 === null)) {
+    const kicker = Math.min(10, (input.momentum12_1 - 0.4) * 25);
+    composite += kicker;
+    positives.push(`Strong momentum — up ${(input.momentum12_1 * 100).toFixed(0)}% (12-1) in an uptrend`);
+  }
+
+  // Overbought guard — softened so we don't punish healthy momentum; only extreme RSI.
   if (input.rsi14 !== null) {
-    if (input.rsi14 > 75) {
-      composite -= 8;
-      negatives.push(`Overbought — RSI ${input.rsi14.toFixed(0)} (>75), pullback risk`);
+    if (input.rsi14 > 82) {
+      composite -= 5;
+      negatives.push(`Very overbought — RSI ${input.rsi14.toFixed(0)} (>82), near-term pullback risk`);
     } else if (input.rsi14 < 30) {
       positives.push(`Oversold — RSI ${input.rsi14.toFixed(0)} (<30), possible bounce`);
     }

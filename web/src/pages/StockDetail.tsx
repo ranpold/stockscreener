@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api, fmt, type StockAnalysis } from "../api";
 import PriceChart from "../components/PriceChart";
@@ -12,20 +12,45 @@ const RANGES = ["3mo", "6mo", "1y", "2y", "5y"] as const;
 
 export default function StockDetail() {
   const { ticker = "" } = useParams();
+  const navigate = useNavigate();
   const [range, setRange] = useState<string>("1y");
   const [tab, setTab] = useState<Tab>("risk");
+  const [recovering, setRecovering] = useState(false);
 
-  const { data, isLoading, isError, error } = useQuery<StockAnalysis>({
+  const { data, isLoading, isError } = useQuery<StockAnalysis>({
     queryKey: ["stock", ticker, range],
     queryFn: () => api.stock(ticker, range),
+    retry: false,
   });
 
-  if (isLoading) return <div className="text-muted py-12 text-center">Loading {ticker}…</div>;
+  // If the symbol isn't valid (e.g. someone navigated to /stock/APPLE), try to
+  // resolve it via search and redirect to the real symbol instead of dead-ending.
+  useEffect(() => {
+    if (!isError || !ticker) return;
+    let cancelled = false;
+    setRecovering(true);
+    api
+      .resolveSymbol(ticker)
+      .then((sym) => {
+        if (!cancelled && sym && sym.toUpperCase() !== ticker.toUpperCase()) {
+          navigate(`/stock/${sym}`, { replace: true });
+        }
+      })
+      .finally(() => !cancelled && setRecovering(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [isError, ticker, navigate]);
+
+  if (isLoading || (isError && recovering))
+    return <div className="text-muted py-12 text-center">Loading {ticker}…</div>;
   if (isError || !data)
     return (
       <div className="py-12 text-center space-y-3">
-        <div className="text-neg">Couldn't load {ticker}. {String(error ?? "")}</div>
-        <Link to="/" className="text-accent text-sm">← Back to screener</Link>
+        <div className="text-neg">
+          Couldn't find “{ticker}”. It may not be a valid symbol — try searching by company name.
+        </div>
+        <Link to="/" className="text-accent text-sm">← Back to search</Link>
       </div>
     );
 

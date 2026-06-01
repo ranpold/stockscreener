@@ -13,15 +13,16 @@ export default function Watchlists() {
   const [name, setName] = useState("");
   const [tickers, setTickers] = useState("");
   const [addTo, setAddTo] = useState<Record<string, string>>({});
+  const [addErr, setAddErr] = useState<Record<string, string>>({});
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["watchlists"] });
 
   const create = useMutation({
-    mutationFn: () =>
-      api.createWatchlist(
-        name.trim(),
-        tickers.split(",").map((t) => t.trim().toUpperCase()).filter(Boolean),
-      ),
+    mutationFn: async () => {
+      const raw = tickers.split(",").map((t) => t.trim()).filter(Boolean);
+      const resolved = await api.resolveSymbols(raw);
+      return api.createWatchlist(name.trim(), resolved);
+    },
     onSuccess: () => {
       setName("");
       setTickers("");
@@ -34,6 +35,21 @@ export default function Watchlists() {
       api.updateWatchlist(id, tickers),
     onSuccess: invalidate,
   });
+
+  // Resolve free text to a valid symbol before adding it to a watchlist.
+  const addTicker = async (w: Watchlist) => {
+    const raw = (addTo[w.id] ?? "").trim();
+    if (!raw) return;
+    setAddErr((s) => ({ ...s, [w.id]: "" }));
+    const sym = await api.resolveSymbol(raw);
+    if (!sym) {
+      setAddErr((s) => ({ ...s, [w.id]: `No match for "${raw}"` }));
+      return;
+    }
+    const next = Array.from(new Set([...w.tickers, sym]));
+    update.mutate({ id: w.id, tickers: next });
+    setAddTo((s) => ({ ...s, [w.id]: "" }));
+  };
 
   const remove = useMutation({
     mutationFn: (id: string) => api.deleteWatchlist(id),
@@ -111,21 +127,20 @@ export default function Watchlists() {
                 </span>
               ))}
             </div>
-            <div className="flex gap-2 mt-3">
+            <div className="flex gap-2 mt-3 items-center">
               <input
                 value={addTo[w.id] ?? ""}
                 onChange={(e) => setAddTo((s) => ({ ...s, [w.id]: e.target.value }))}
-                placeholder="Add ticker"
-                className="bg-panel2 border border-edge rounded px-2 py-1 text-xs w-32 focus:border-accent outline-none"
+                placeholder="Add ticker or name"
+                className="bg-panel2 border border-edge rounded px-2 py-1 text-xs w-40 focus:border-accent outline-none"
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && addTo[w.id]?.trim()) {
-                    const next = Array.from(new Set([...w.tickers, addTo[w.id].trim().toUpperCase()]));
-                    update.mutate({ id: w.id, tickers: next });
-                    setAddTo((s) => ({ ...s, [w.id]: "" }));
-                  }
+                  if (e.key === "Enter") void addTicker(w);
                 }}
               />
-              <span className="text-muted text-xs self-center">press Enter</span>
+              <button onClick={() => void addTicker(w)} className="text-accent text-xs hover:underline">
+                Add
+              </button>
+              {addErr[w.id] && <span className="text-neg text-xs">{addErr[w.id]}</span>}
             </div>
           </div>
         ))}

@@ -156,6 +156,23 @@ export const api = {
     return getJson(`/api/search?q=${encodeURIComponent(q)}`);
   },
 
+  // Resolve free text (name or ticker) to a real symbol via search. null if no match.
+  async resolveSymbol(input: string): Promise<string | null> {
+    const term = input.trim();
+    if (!term) return null;
+    const { results } = await api.search(term);
+    return results[0]?.symbol ?? null;
+  },
+
+  async resolveSymbols(inputs: string[]): Promise<string[]> {
+    const out: string[] = [];
+    for (const i of inputs) {
+      const s = await api.resolveSymbol(i);
+      if (s) out.push(s);
+    }
+    return Array.from(new Set(out));
+  },
+
   universe(): Promise<{ sp500: string[] }> {
     return getJson(`/api/universe`);
   },

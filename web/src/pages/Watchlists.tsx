@@ -88,16 +88,23 @@ export default function Watchlists() {
                 </button>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2 mt-3">
+            {w.tickers.length > 0 && (
+              <div className="text-[11px] text-muted mt-3">Click a ticker for full quant analysis →</div>
+            )}
+            <div className="flex flex-wrap gap-2 mt-2">
               {w.tickers.length === 0 && <span className="text-muted text-xs">No tickers yet.</span>}
               {w.tickers.map((t) => (
-                <span key={t} className="bg-panel2 border border-edge rounded px-2 py-1 text-xs flex items-center gap-1">
-                  <Link to={`/stock/${t}`} className="text-ink hover:text-accent">
-                    {t}
+                <span key={t} className="bg-panel2 border border-edge rounded px-1 py-1 text-xs flex items-center gap-1">
+                  <Link
+                    to={`/stock/${t}`}
+                    className="px-2 py-0.5 rounded text-accent font-semibold hover:bg-accent hover:text-white transition"
+                  >
+                    {t} →
                   </Link>
                   <button
                     onClick={() => update.mutate({ id: w.id, tickers: w.tickers.filter((x) => x !== t) })}
-                    className="text-muted hover:text-neg"
+                    className="text-muted hover:text-neg px-1"
+                    title="Remove"
                   >
                     ×
                   </button>

@@ -57,5 +57,5 @@ export default function PriceChart({ bars }: { bars: OHLCVBar[] }) {
     };
   }, [bars]);
 
-  return <div ref={ref} className="w-full" />;
+  return <div ref={ref} className="w-full h-[360px]" />;
 }

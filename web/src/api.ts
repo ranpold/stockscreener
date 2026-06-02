@@ -130,6 +130,15 @@ export interface StockAnalysis {
   recommendation: Recommendation;
   news: NewsItem[];
   etf: EtfBreakdown | null;
+  historyYears: number;
+}
+
+export interface EarningsEvent {
+  date: string;
+  symbol: string;
+  epsEstimate: number | null;
+  revenueEstimate: number | null;
+  hour: string;
 }
 
 export interface Watchlist {
@@ -175,6 +184,10 @@ export const api = {
 
   chart(ticker: string, range: string): Promise<{ bars: OHLCVBar[] }> {
     return getJson(`/api/chart/${encodeURIComponent(ticker)}?range=${range}`);
+  },
+
+  earnings(): Promise<{ events: EarningsEvent[] }> {
+    return getJson(`/api/earnings`);
   },
 
   search(q: string): Promise<{ results: SearchResult[] }> {

@@ -30,15 +30,28 @@ export function stddev(xs: number[]): number {
   return Math.sqrt(variance);
 }
 
-/** Compound annual growth rate from first to last price over the series' span. */
+/**
+ * Annualized growth rate from first to last price.
+ * For spans under one year we do NOT annualize — extrapolating a partial year
+ * (e.g. a 2-month IPO) produces absurd numbers. Instead we return the total
+ * return over the available period.
+ */
 export function cagr(prices: number[]): number {
   if (prices.length < 2) return 0;
   const first = prices[0];
   const last = prices[prices.length - 1];
   if (first <= 0) return 0;
+  const totalReturn = last / first - 1;
   const years = (prices.length - 1) / TRADING_DAYS;
-  if (years <= 0) return 0;
+  // Below ~11 months of data, don't annualize — extrapolating a partial year
+  // (e.g. a recent IPO) produces absurd CAGRs. Report the total return instead.
+  if (years < 0.9) return totalReturn;
   return (last / first) ** (1 / years) - 1;
+}
+
+/** Years of price history represented by the series (trading-day based). */
+export function historyYears(prices: number[]): number {
+  return prices.length > 1 ? (prices.length - 1) / TRADING_DAYS : 0;
 }
 
 /** Annualized volatility from daily returns. */

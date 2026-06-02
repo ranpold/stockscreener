@@ -3,7 +3,9 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { api, fmt, type StockAnalysis } from "../api";
 import MetricCard from "../components/MetricCard";
+import RatedMetric from "../components/RatedMetric";
 import RecommendationPanel from "../components/RecommendationPanel";
+import { DESC } from "../lib/ratings";
 
 // Lazy-loaded so lightweight-charts isn't in the initial bundle.
 const PriceChart = lazy(() => import("../components/PriceChart"));
@@ -75,8 +77,6 @@ export default function StockDetail() {
     );
 
   const q = data.quote;
-  const tones = (x: number | null | undefined) =>
-    x === null || x === undefined ? "neutral" : x >= 0 ? "pos" : "neg";
 
   // Price + change aligned to the selected timeframe (like Robinhood).
   // "Today" uses the quote (vs previous close); other periods use first->last of the series.
@@ -178,33 +178,28 @@ export default function StockDetail() {
 
       {tab === "risk" && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <MetricCard label="CAGR" value={fmt.pct(data.risk.cagr)} tone={tones(data.risk.cagr)} hint="annualized" />
-          <MetricCard label="Volatility" value={fmt.pct(data.risk.annualizedVolatility)} hint="annualized σ" />
-          <MetricCard label="Sharpe" value={fmt.num(data.risk.sharpe)} tone={tones(data.risk.sharpe)} hint="rf 4%" />
-          <MetricCard label="Sortino" value={fmt.num(data.risk.sortino)} tone={tones(data.risk.sortino)} hint="downside" />
-          <MetricCard label="Max Drawdown" value={fmt.pct(data.risk.maxDrawdown)} tone="neg" />
-          <MetricCard label="Beta" value={fmt.num(data.risk.beta)} hint="vs SPY" />
+          <RatedMetric metric="cagr" label={data.historyYears < 0.9 ? "Total Return" : "CAGR"} value={fmt.pct(data.risk.cagr)} raw={data.risk.cagr} hint={data.historyYears < 0.9 ? DESC.cagrTotal : DESC.cagr} />
+          <RatedMetric metric="volatility" label="Volatility" value={fmt.pct(data.risk.annualizedVolatility)} raw={data.risk.annualizedVolatility} />
+          <RatedMetric metric="sharpe" label="Sharpe" value={fmt.num(data.risk.sharpe)} raw={data.risk.sharpe} />
+          <RatedMetric metric="sortino" label="Sortino" value={fmt.num(data.risk.sortino)} raw={data.risk.sortino} />
+          <RatedMetric metric="maxDrawdown" label="Max Drawdown" value={fmt.pct(data.risk.maxDrawdown)} raw={data.risk.maxDrawdown} />
+          <RatedMetric metric="beta" label="Beta" value={fmt.num(data.risk.beta)} raw={data.risk.beta} />
         </div>
       )}
 
       {tab === "technical" && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <MetricCard label="Last Close" value={fmt.money(data.technical.lastClose)} />
-          <MetricCard label="SMA 50" value={fmt.money(data.technical.sma50 ?? undefined)} />
-          <MetricCard label="SMA 200" value={fmt.money(data.technical.sma200 ?? undefined)} />
-          <MetricCard label="EMA 20" value={fmt.money(data.technical.ema20 ?? undefined)} />
-          <MetricCard
-            label="RSI 14"
-            value={fmt.num(data.technical.rsi14, 1)}
-            tone={data.technical.rsi14 == null ? "neutral" : data.technical.rsi14 > 70 ? "neg" : data.technical.rsi14 < 30 ? "pos" : "neutral"}
-            hint=">70 overbought"
-          />
-          <MetricCard label="MACD" value={fmt.num(data.technical.macd, 2)} tone={tones(data.technical.macd)} />
-          <MetricCard label="MACD Signal" value={fmt.num(data.technical.macdSignal, 2)} />
-          <MetricCard label="MACD Hist" value={fmt.num(data.technical.macdHistogram, 2)} tone={tones(data.technical.macdHistogram)} />
-          <MetricCard label="Boll Upper" value={fmt.money(data.technical.bollingerUpper ?? undefined)} />
-          <MetricCard label="Boll Lower" value={fmt.money(data.technical.bollingerLower ?? undefined)} />
-          <MetricCard label="Momentum 12-1" value={fmt.pct(data.technical.momentum12_1)} tone={tones(data.technical.momentum12_1)} />
+          <MetricCard label="Last Close" value={fmt.money(data.technical.lastClose)} hint={DESC.lastClose} />
+          <RatedMetric metric="sma50" label="SMA 50" value={fmt.money(data.technical.sma50 ?? undefined)} raw={data.technical.sma50} ctx={{ lastClose: data.technical.lastClose }} />
+          <RatedMetric metric="sma200" label="SMA 200" value={fmt.money(data.technical.sma200 ?? undefined)} raw={data.technical.sma200} ctx={{ lastClose: data.technical.lastClose }} />
+          <RatedMetric metric="ema20" label="EMA 20" value={fmt.money(data.technical.ema20 ?? undefined)} raw={data.technical.ema20} ctx={{ lastClose: data.technical.lastClose }} />
+          <RatedMetric metric="rsi14" label="RSI 14" value={fmt.num(data.technical.rsi14, 1)} raw={data.technical.rsi14} />
+          <RatedMetric metric="macd" label="MACD" value={fmt.num(data.technical.macd, 2)} raw={data.technical.macd} />
+          <MetricCard label="MACD Signal" value={fmt.num(data.technical.macdSignal, 2)} hint={DESC.macdSignal} />
+          <RatedMetric metric="macdHistogram" label="MACD Hist" value={fmt.num(data.technical.macdHistogram, 2)} raw={data.technical.macdHistogram} />
+          <MetricCard label="Boll Upper" value={fmt.money(data.technical.bollingerUpper ?? undefined)} hint={DESC.bollingerUpper} />
+          <MetricCard label="Boll Lower" value={fmt.money(data.technical.bollingerLower ?? undefined)} hint={DESC.bollingerLower} />
+          <RatedMetric metric="momentum" label="Momentum 12-1" value={fmt.pct(data.technical.momentum12_1)} raw={data.technical.momentum12_1} />
         </div>
       )}
 
@@ -217,29 +212,28 @@ export default function StockDetail() {
       )}
       {tab === "valuation" && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-          <MetricCard label="P/E" value={fmt.num(data.fundamental.pe, 1)} />
-          <MetricCard label="P/B" value={fmt.num(data.fundamental.pb, 2)} />
-          <MetricCard label="EV/EBITDA" value={fmt.num(data.fundamental.evEbitda, 1)} />
-          <MetricCard label="ROE" value={fmt.pct(data.fundamental.roe)} tone={tones(data.fundamental.roe)} />
-          <MetricCard label="Gross Margin" value={fmt.pct(data.fundamental.grossMargin)} />
-          <MetricCard label="Net Margin" value={fmt.pct(data.fundamental.netMargin)} tone={tones(data.fundamental.netMargin)} />
-          <MetricCard label="Revenue Growth" value={fmt.pct(data.fundamental.revenueGrowth)} tone={tones(data.fundamental.revenueGrowth)} />
-          <MetricCard label="EPS Growth" value={fmt.pct(data.fundamental.epsGrowth)} tone={tones(data.fundamental.epsGrowth)} />
-          <MetricCard label="Piotroski F" value={data.fundamental.piotroski?.toString() ?? "—"} hint="0–9" tone={data.fundamental.piotroski == null ? "neutral" : data.fundamental.piotroski >= 7 ? "pos" : data.fundamental.piotroski <= 3 ? "neg" : "neutral"} />
+          <RatedMetric metric="pe" label="P/E" value={fmt.num(data.fundamental.pe, 1)} raw={data.fundamental.pe} />
+          <RatedMetric metric="pb" label="P/B" value={fmt.num(data.fundamental.pb, 2)} raw={data.fundamental.pb} />
+          <RatedMetric metric="evEbitda" label="EV/EBITDA" value={fmt.num(data.fundamental.evEbitda, 1)} raw={data.fundamental.evEbitda} />
+          <RatedMetric metric="roe" label="ROE" value={fmt.pct(data.fundamental.roe)} raw={data.fundamental.roe} />
+          <RatedMetric metric="grossMargin" label="Gross Margin" value={fmt.pct(data.fundamental.grossMargin)} raw={data.fundamental.grossMargin} />
+          <RatedMetric metric="netMargin" label="Net Margin" value={fmt.pct(data.fundamental.netMargin)} raw={data.fundamental.netMargin} />
+          <RatedMetric metric="revenueGrowth" label="Revenue Growth" value={fmt.pct(data.fundamental.revenueGrowth)} raw={data.fundamental.revenueGrowth} />
+          <RatedMetric metric="epsGrowth" label="EPS Growth" value={fmt.pct(data.fundamental.epsGrowth)} raw={data.fundamental.epsGrowth} />
+          <RatedMetric metric="piotroski" label="Piotroski F" value={data.fundamental.piotroski?.toString() ?? "—"} raw={data.fundamental.piotroski} />
         </div>
       )}
 
       {tab === "factor" && (
         <div className="space-y-3">
           <p className="text-muted text-sm">
-            Factor exposures are cross-sectional z-scores — they're computed against a universe in the
-            screener. Run a screen to rank this name against peers. Here are its standalone signals:
+            Standalone factor signals for this name (the screener z-scores these against a peer universe):
           </p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <MetricCard label="Earnings Yield" value={data.fundamental.pe && data.fundamental.pe > 0 ? fmt.pct(1 / data.fundamental.pe) : "—"} hint="value proxy" />
-            <MetricCard label="Momentum 12-1" value={fmt.pct(data.technical.momentum12_1)} tone={tones(data.technical.momentum12_1)} />
-            <MetricCard label="ROE" value={fmt.pct(data.fundamental.roe)} hint="quality proxy" tone={tones(data.fundamental.roe)} />
-            <MetricCard label="Volatility" value={fmt.pct(data.risk.annualizedVolatility)} hint="low-vol proxy (lower=better)" />
+            <RatedMetric metric="earningsYield" label="Earnings Yield" value={data.fundamental.pe && data.fundamental.pe > 0 ? fmt.pct(1 / data.fundamental.pe) : "—"} raw={data.fundamental.pe && data.fundamental.pe > 0 ? 1 / data.fundamental.pe : null} hint="Value factor — earnings ÷ price" />
+            <RatedMetric metric="momentum" label="Momentum 12-1" value={fmt.pct(data.technical.momentum12_1)} raw={data.technical.momentum12_1} hint="Momentum factor" />
+            <RatedMetric metric="roe" label="ROE" value={fmt.pct(data.fundamental.roe)} raw={data.fundamental.roe} hint="Quality factor" />
+            <RatedMetric metric="volatility" label="Volatility" value={fmt.pct(data.risk.annualizedVolatility)} raw={data.risk.annualizedVolatility} hint="Low-vol factor — lower is better" />
           </div>
         </div>
       )}

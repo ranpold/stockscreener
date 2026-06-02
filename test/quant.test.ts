@@ -34,6 +34,14 @@ describe("risk", () => {
     expect(prices.length).toBe(253);
   });
 
+  it("cagr does not annualize sub-1-year history (IPO case)", () => {
+    // ~2 months (42 trading days), +50% — must report total ~0.5, not extrapolated
+    const prices = Array(42).fill(0).map((_, i) => 100 * (1 + (0.5 * i) / 41));
+    const c = cagr(prices);
+    expect(c).toBeCloseTo(0.5, 2);
+    expect(c).toBeLessThan(1); // not blown up by annualization
+  });
+
   it("maxDrawdown finds worst peak-to-trough", () => {
     expect(maxDrawdown([100, 120, 60, 80])).toBeCloseTo(-0.5, 5);
     expect(maxDrawdown([100, 110, 120])).toBe(0);

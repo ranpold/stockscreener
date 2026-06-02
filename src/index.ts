@@ -6,6 +6,7 @@ import { SP500 } from "./universe/sp500";
 import { watchlistRoutes } from "./routes/watchlists";
 import { authRoutes } from "./routes/auth";
 import { searchSymbols } from "./providers/search";
+import { upcomingEarnings } from "./providers/earnings";
 import { data as dataProvider } from "./providers";
 
 const dataChart = (ticker: string, tf: string) => dataProvider.getChartBars(ticker, tf);
@@ -19,12 +20,17 @@ app.use("/api/*", cors());
  * On a miss it runs `build`, caches 200s for `ttl` seconds, and returns.
  * Repeat views are served at the edge (~RTT) without recomputing or touching Turso.
  */
+// Bump when an API response shape changes so deploys don't serve stale cached JSON.
+const CACHE_VERSION = "5";
+
 async function edgeCached(
   c: { req: { url: string }; executionCtx: ExecutionContext },
   ttl: number,
   build: () => Promise<{ status: number; data: unknown }>,
 ): Promise<Response> {
-  const key = new Request(new URL(c.req.url).toString());
+  const u = new URL(c.req.url);
+  u.searchParams.set("__v", CACHE_VERSION);
+  const key = new Request(u.toString());
   const cache = caches.default;
   const hit = await cache.match(key);
   if (hit) return hit;
@@ -43,6 +49,14 @@ async function edgeCached(
 app.get("/api/health", (c) => c.json({ ok: true, time: Date.now() }));
 
 app.get("/api/universe", (c) => edgeCached(c, 86400, async () => ({ status: 200, data: { sp500: SP500 } })));
+
+// Upcoming earnings calendar (homepage).
+app.get("/api/earnings", (c) =>
+  edgeCached(c, 3600, async () => {
+    const events = await upcomingEarnings(c.env.FINNHUB_API_KEY ?? "", new Set(SP500));
+    return { status: 200, data: { events } };
+  }),
+);
 
 // Search symbols by company name or ticker (stocks + ETFs).
 app.get("/api/search", (c) => {

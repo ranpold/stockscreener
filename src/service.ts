@@ -1,7 +1,7 @@
 import type { Client } from "@libsql/client/web";
 import { data, type ProviderEnv, type Range } from "./providers";
 import { cached, TTL } from "./db/cache";
-import { riskMetrics, annualizedVolatility, dailyReturns, type RiskMetrics } from "./quant/risk";
+import { riskMetrics, annualizedVolatility, dailyReturns, historyYears, type RiskMetrics } from "./quant/risk";
 import { technicalSnapshot, momentum, type TechnicalSnapshot } from "./quant/technical";
 import type { FundamentalMetrics, RawFundamentals } from "./quant/fundamental";
 import { recommend, type Recommendation } from "./quant/recommendation";
@@ -32,6 +32,7 @@ export interface StockAnalysis {
   recommendation: Recommendation;
   news: NewsItem[];
   etf: EtfBreakdown | null;
+  historyYears: number;
   raw: RawFundamentals | null;
 }
 
@@ -106,6 +107,7 @@ export async function buildStockAnalysis(
     recommendation,
     news,
     etf,
+    historyYears: historyYears(closes),
     raw: fundRes.raw,
   };
 }

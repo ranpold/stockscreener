@@ -1,7 +1,79 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { api, type Watchlist } from "../api";
+import { api, fmt, type Watchlist, type Snapshot } from "../api";
+
+const VERDICT_STYLE: Record<Snapshot["verdict"], string> = {
+  "Strong Buy": "bg-pos/20 text-pos",
+  Buy: "bg-pos/15 text-pos",
+  Hold: "bg-yellow-500/15 text-yellow-400",
+  Reduce: "bg-neg/15 text-neg",
+  Avoid: "bg-neg/20 text-neg",
+};
+
+/** Snippet cards for a watchlist's tickers; each links to the full deep-dive. */
+function SnapshotGrid({ tickers, onRemove }: { tickers: string[]; onRemove: (t: string) => void }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["snapshots", tickers.join(",")],
+    queryFn: () => api.snapshots(tickers),
+    enabled: tickers.length > 0,
+  });
+  if (tickers.length === 0) return <span className="text-muted text-xs">No tickers yet.</span>;
+  if (isLoading) return <div className="text-muted text-sm">Loading snapshots…</div>;
+  const byTicker = new Map((data?.snapshots ?? []).map((s) => [s.ticker, s]));
+
+  return (
+    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {tickers.map((t) => {
+        const s = byTicker.get(t);
+        const up = (s?.changePercent ?? 0) >= 0;
+        return (
+          <div key={t} className="relative bg-panel2 border border-edge rounded-lg p-3 hover:border-accent transition group">
+            <button
+              onClick={() => onRemove(t)}
+              title="Remove"
+              className="absolute top-2 right-2 text-muted hover:text-neg text-sm opacity-0 group-hover:opacity-100"
+            >
+              ×
+            </button>
+            <Link to={`/stock/${t}`} className="block">
+              <div className="flex items-baseline gap-2">
+                <span className="font-bold text-accent">{t}</span>
+                {s?.isEtf && <span className="text-[10px] bg-edge px-1 rounded text-muted">ETF</span>}
+              </div>
+              <div className="text-[11px] text-muted truncate">{s?.name ?? ""}</div>
+              {s ? (
+                <>
+                  <div className="flex items-baseline gap-2 mt-1.5">
+                    <span className="text-lg font-semibold tabular-nums">{fmt.money(s.price ?? undefined)}</span>
+                    {s.changePercent != null && (
+                      <span className={`text-xs tabular-nums ${up ? "text-pos" : "text-neg"}`}>
+                        {up ? "+" : ""}{fmt.pct(s.changePercent)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${VERDICT_STYLE[s.verdict]}`}>
+                      {s.verdict} · {s.score}
+                    </span>
+                    <span className="text-[11px] text-muted">Details →</span>
+                  </div>
+                  <div className="flex gap-3 mt-2 text-[11px] text-muted tabular-nums">
+                    <span>Sharpe {fmt.num(s.sharpe)}</span>
+                    <span>P/E {fmt.num(s.pe, 1)}</span>
+                    <span>Mom {fmt.pct(s.momentum)}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="text-xs text-muted mt-2">No data — click for details</div>
+              )}
+            </Link>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function Watchlists() {
   const qc = useQueryClient();
@@ -125,28 +197,11 @@ export default function Watchlists() {
                 Delete
               </button>
             </div>
-            {w.tickers.length > 0 && (
-              <div className="text-[11px] text-muted mt-3">Click a ticker for full quant analysis →</div>
-            )}
-            <div className="flex flex-wrap gap-2 mt-2">
-              {w.tickers.length === 0 && <span className="text-muted text-xs">No tickers yet.</span>}
-              {w.tickers.map((t) => (
-                <span key={t} className="bg-panel2 border border-edge rounded px-1 py-1 text-xs flex items-center gap-1">
-                  <Link
-                    to={`/stock/${t}`}
-                    className="px-2 py-0.5 rounded text-accent font-semibold hover:bg-accent hover:text-white transition"
-                  >
-                    {t} →
-                  </Link>
-                  <button
-                    onClick={() => update.mutate({ id: w.id, tickers: w.tickers.filter((x) => x !== t) })}
-                    className="text-muted hover:text-neg px-1"
-                    title="Remove"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
+            <div className="mt-3">
+              <SnapshotGrid
+                tickers={w.tickers}
+                onRemove={(t) => update.mutate({ id: w.id, tickers: w.tickers.filter((x) => x !== t) })}
+              />
             </div>
             <div className="flex gap-2 mt-3 items-center">
               <input

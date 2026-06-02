@@ -146,6 +146,20 @@ export interface Mover {
   changePercent: number;
 }
 
+export interface Snapshot {
+  ticker: string;
+  name: string;
+  price: number | null;
+  changePercent: number | null;
+  isEtf: boolean;
+  verdict: "Strong Buy" | "Buy" | "Hold" | "Reduce" | "Avoid";
+  score: number;
+  sharpe: number;
+  cagr: number;
+  momentum: number;
+  pe: number | null;
+}
+
 export interface Watchlist {
   id: string;
   name: string;
@@ -197,6 +211,10 @@ export const api = {
 
   movers(): Promise<{ gainers: Mover[]; losers: Mover[] }> {
     return getJson(`/api/movers`);
+  },
+
+  snapshots(tickers: string[]): Promise<{ snapshots: Snapshot[] }> {
+    return getJson(`/api/snapshots?tickers=${encodeURIComponent(tickers.join(","))}`);
   },
 
   news(ticker: string): Promise<{ news: NewsItem[] }> {

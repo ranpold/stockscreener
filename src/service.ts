@@ -111,6 +111,80 @@ export function getEtf(db: Client, ticker: string) {
   return cached(db, `etf:${sym}`, TTL.etf, () => getEtfBreakdown(sym));
 }
 
+export interface Snapshot {
+  ticker: string;
+  name: string;
+  price: number | null;
+  changePercent: number | null;
+  isEtf: boolean;
+  verdict: Recommendation["verdict"];
+  score: number;
+  sharpe: number;
+  cagr: number;
+  momentum: number;
+  pe: number | null;
+}
+
+/** Lightweight per-ticker summary for watchlist cards (lite fundamentals, no SPY/news/etf). */
+async function buildSnapshot(db: Client, env: Env, ticker: string): Promise<Snapshot | null> {
+  const sym = ticker.toUpperCase();
+  const [bars, quote, fundRes] = await Promise.all([
+    cached(db, `ohlcv:${sym}:1y`, TTL.ohlcv, () => data.getOHLCV(sym, "1y")),
+    cached(db, `quote:${sym}`, TTL.quote, () => data.getQuote(sym)),
+    cached(db, `fund:${sym}`, TTL.fundamentals, () => data.getFundamentals(sym, env, false)),
+  ]);
+  if (!bars.length) return null;
+  const closes = bars.map((b) => b.close);
+  const risk = riskMetrics(closes);
+  const tech = technicalSnapshot(closes);
+  const f = fundRes.metrics;
+  const isEtf = (quote?.instrumentType ?? "").toUpperCase() === "ETF";
+  const rec = recommend({
+    isEtf,
+    sharpe: risk.sharpe,
+    sortino: risk.sortino,
+    maxDrawdown: risk.maxDrawdown,
+    cagr: risk.cagr,
+    lastClose: tech.lastClose,
+    sma50: tech.sma50,
+    sma200: tech.sma200,
+    rsi14: tech.rsi14,
+    macd: tech.macd,
+    macdSignal: tech.macdSignal,
+    momentum12_1: tech.momentum12_1,
+    pe: f.pe,
+    pb: f.pb,
+    roe: f.roe,
+    netMargin: f.netMargin,
+    piotroski: f.piotroski,
+  });
+  return {
+    ticker: sym,
+    name: quote?.name ?? sym,
+    price: quote?.price ?? tech.lastClose,
+    changePercent: quote?.changePercent ?? null,
+    isEtf,
+    verdict: rec.verdict,
+    score: rec.score,
+    sharpe: risk.sharpe,
+    cagr: risk.cagr,
+    momentum: tech.momentum12_1,
+    pe: f.pe,
+  };
+}
+
+/** Build snapshots for a list of tickers with bounded concurrency. */
+export async function buildSnapshots(db: Client, env: Env, tickers: string[]): Promise<Snapshot[]> {
+  const out: Snapshot[] = [];
+  const CONCURRENCY = 6;
+  for (let i = 0; i < tickers.length; i += CONCURRENCY) {
+    const batch = tickers.slice(i, i + CONCURRENCY);
+    const res = await Promise.all(batch.map((t) => buildSnapshot(db, env, t).catch(() => null)));
+    for (const s of res) if (s) out.push(s);
+  }
+  return out;
+}
+
 export interface ScreenRow {
   ticker: string;
   name?: string;

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { getDb, ensureSchema } from "./db/client";
-import { buildStockAnalysis, buildScreen, getNews, getEtf, type Env, type ScreenFilters } from "./service";
+import { buildStockAnalysis, buildScreen, buildSnapshots, getNews, getEtf, type Env, type ScreenFilters } from "./service";
 import { SP500 } from "./universe/sp500";
 import { watchlistRoutes } from "./routes/watchlists";
 import { authRoutes } from "./routes/auth";
@@ -117,6 +117,19 @@ app.get("/api/etf/:ticker", (c) => {
     await ensureSchema(client);
     const etf = await getEtf(client, ticker);
     return { status: 200, data: { etf } };
+  });
+});
+
+// Lightweight snapshots for a set of tickers (watchlist cards).
+app.get("/api/snapshots", (c) => {
+  const raw = (c.req.query("tickers") || "").trim();
+  if (!raw) return c.json({ snapshots: [] });
+  return edgeCached(c, 300, async () => {
+    const tickers = raw.split(",").map((t) => t.trim().toUpperCase()).filter(Boolean).slice(0, 50);
+    const client = getDb(c.env);
+    await ensureSchema(client);
+    const snapshots = await buildSnapshots(client, c.env, tickers);
+    return { status: 200, data: { snapshots } };
   });
 });
 

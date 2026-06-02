@@ -1,4 +1,6 @@
 import type { FundamentalMetrics, RawFundamentals } from "../quant/fundamental";
+import type { Quote, Profile } from "./types";
+import type { SearchResult } from "./search";
 
 const BASE = "https://finnhub.io/api/v1";
 
@@ -53,4 +55,45 @@ export async function finnhubFundamentals(
 
   if (Object.keys(metrics).length === 0) return null;
   return { metrics, raw: null };
+}
+
+/** Finnhub real-time quote fallback (free /quote): price + daily change. */
+export async function finnhubQuote(ticker: string, apiKey: string): Promise<Quote | null> {
+  if (!apiKey) return null;
+  const d = await getJson(`${BASE}/quote?symbol=${encodeURIComponent(ticker)}&token=${apiKey}`);
+  if (!d || typeof d.c !== "number" || d.c === 0) return null;
+  return {
+    ticker,
+    price: d.c,
+    change: typeof d.d === "number" ? d.d : 0,
+    changePercent: typeof d.dp === "number" ? d.dp / 100 : 0,
+  };
+}
+
+/** Finnhub company profile fallback (free /stock/profile2): name, exchange, type. */
+export async function finnhubProfile(ticker: string, apiKey: string): Promise<Profile | null> {
+  if (!apiKey) return null;
+  const p = await getJson(`${BASE}/stock/profile2?symbol=${encodeURIComponent(ticker)}&token=${apiKey}`);
+  if (!p || !p.name) return null;
+  return {
+    ticker,
+    name: p.name,
+    industry: p.finnhubIndustry,
+    exchange: p.exchange,
+  };
+}
+
+/** Finnhub symbol search fallback (free /search). */
+export async function finnhubSearch(query: string, apiKey: string): Promise<SearchResult[]> {
+  if (!apiKey) return [];
+  const d = await getJson(`${BASE}/search?q=${encodeURIComponent(query)}&token=${apiKey}`);
+  const results: any[] = d?.result ?? [];
+  return results
+    .filter((r) => r.symbol && !r.symbol.includes(".")) // prefer plain US symbols
+    .slice(0, 8)
+    .map((r) => ({
+      symbol: r.symbol,
+      name: r.description ?? r.symbol,
+      type: r.type === "ETP" ? "etf" : "stock",
+    }));
 }

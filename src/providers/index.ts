@@ -7,13 +7,16 @@ import {
 } from "../quant/fundamental";
 import { yahooProvider, yahooSparkCloses } from "./yahoo";
 import { fmpFundamentals, fmpProfile } from "./fmp";
-import { finnhubFundamentals } from "./finnhub";
+import { finnhubFundamentals, finnhubQuote, finnhubProfile } from "./finnhub";
+import { twelveOHLCV, twelveFundamentals } from "./twelvedata";
+import { stooqOHLCV } from "./stooq";
 
 export type { OHLCVBar, Profile, Quote, Range, DataProvider };
 
 export interface ProviderEnv {
   FINNHUB_API_KEY?: string;
   FMP_API_KEY?: string;
+  TWELVE_DATA_API_KEY?: string;
 }
 
 export interface FundamentalsResult {
@@ -45,25 +48,44 @@ function fillGaps(target: FundamentalMetrics, src: Partial<FundamentalMetrics>):
   }
 }
 
+const OUTPUTSIZE: Record<string, number> = { "1mo": 30, "3mo": 70, "6mo": 130, "1y": 260, "2y": 520, "5y": 1300 };
+
 /**
- * Aggregated data access. Yahoo serves prices/quotes (free); FMP is the primary
- * fundamentals source, with Finnhub then Yahoo filling any gaps.
+ * Aggregated data access with fallback chains so we degrade gracefully when a
+ * source hits a rate limit:
+ *   prices       Yahoo -> Twelve Data -> Stooq
+ *   quote        Yahoo -> Finnhub
+ *   profile      Yahoo -> FMP -> Finnhub
+ *   fundamentals FMP -> Finnhub -> Twelve Data -> Yahoo (raw)
  */
 export const data = {
-  getOHLCV(ticker: string, range: Range): Promise<OHLCVBar[]> {
-    return yahooProvider.getOHLCV(ticker, range);
+  async getOHLCV(ticker: string, range: Range, env?: ProviderEnv): Promise<OHLCVBar[]> {
+    let bars = await yahooProvider.getOHLCV(ticker, range);
+    if (!bars.length && env?.TWELVE_DATA_API_KEY) {
+      bars = await twelveOHLCV(ticker, env.TWELVE_DATA_API_KEY, OUTPUTSIZE[range] ?? 300);
+    }
+    if (!bars.length) bars = await stooqOHLCV(ticker);
+    return bars;
   },
 
-  getChartBars(ticker: string, timeframe: string): Promise<OHLCVBar[]> {
-    return yahooProvider.getChartBars(ticker, timeframe);
+  async getChartBars(ticker: string, timeframe: string, env?: ProviderEnv): Promise<OHLCVBar[]> {
+    let bars = await yahooProvider.getChartBars(ticker, timeframe);
+    // Twelve Data only covers daily here; skip for intraday (1d/5d) timeframes.
+    if (!bars.length && env?.TWELVE_DATA_API_KEY && timeframe !== "1d" && timeframe !== "5d") {
+      bars = await twelveOHLCV(ticker, env.TWELVE_DATA_API_KEY, OUTPUTSIZE[timeframe] ?? 300);
+    }
+    return bars;
   },
 
   getSparkCloses(symbols: string[], range = "1y"): Promise<Map<string, number[]>> {
     return yahooSparkCloses(symbols, range);
   },
 
-  getQuote(ticker: string): Promise<Quote | null> {
-    return yahooProvider.getQuote(ticker);
+  async getQuote(ticker: string, env?: ProviderEnv): Promise<Quote | null> {
+    const y = await yahooProvider.getQuote(ticker);
+    if (y) return y;
+    if (env?.FINNHUB_API_KEY) return finnhubQuote(ticker, env.FINNHUB_API_KEY);
+    return null;
   },
 
   async getProfile(ticker: string, env: ProviderEnv): Promise<Profile | null> {
@@ -72,6 +94,10 @@ export const data = {
     if (env.FMP_API_KEY) {
       const f = await fmpProfile(ticker, env.FMP_API_KEY);
       if (f) return f;
+    }
+    if (env.FINNHUB_API_KEY) {
+      const fh = await finnhubProfile(ticker, env.FINNHUB_API_KEY);
+      if (fh) return fh;
     }
     return y;
   },
@@ -96,10 +122,15 @@ export const data = {
       }
     }
 
-    const needsMore = metrics.pe === null || metrics.roe === null;
-    if (needsMore && env.FINNHUB_API_KEY) {
+    if ((metrics.pe === null || metrics.roe === null) && env.FINNHUB_API_KEY) {
       const fh = await finnhubFundamentals(ticker, env.FINNHUB_API_KEY);
       if (fh) fillGaps(metrics, fh.metrics);
+    }
+
+    // Twelve Data fallback when FMP+Finnhub still left core valuation gaps.
+    if ((metrics.pe === null || metrics.pb === null) && env.TWELVE_DATA_API_KEY) {
+      const td = await twelveFundamentals(ticker, env.TWELVE_DATA_API_KEY);
+      if (td) fillGaps(metrics, td.metrics);
     }
 
     // Yahoo raw as a last resort (only for deep-dive, where we want statements for Piotroski).
@@ -108,7 +139,6 @@ export const data = {
       if (yraw) raw = raw ? { ...yraw, ...raw } : yraw;
     }
 
-    // Derive any still-missing metrics from raw, and compute Piotroski from raw.
     if (raw) {
       fillGaps(metrics, fundamentalMetrics(raw));
       if (metrics.piotroski === null) metrics.piotroski = piotroskiScore(raw);

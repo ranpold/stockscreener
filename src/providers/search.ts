@@ -78,13 +78,17 @@ async function yahooSearch(query: string): Promise<SearchResult[]> {
 
 export async function searchSymbols(
   query: string,
-  env: { FMP_API_KEY?: string },
+  env: { FMP_API_KEY?: string; FINNHUB_API_KEY?: string },
 ): Promise<SearchResult[]> {
   const q = query.trim();
   if (!q) return [];
   let results: SearchResult[] = [];
   if (env.FMP_API_KEY) results = await fmpSearch(q, env.FMP_API_KEY);
   if (results.length === 0) results = await yahooSearch(q);
+  if (results.length === 0 && env.FINNHUB_API_KEY) {
+    const { finnhubSearch } = await import("./finnhub");
+    results = await finnhubSearch(q, env.FINNHUB_API_KEY);
+  }
   // Dedupe by symbol, rank, cap.
   const seen = new Set<string>();
   const deduped = results.filter((r) => {

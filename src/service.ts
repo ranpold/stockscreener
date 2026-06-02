@@ -47,10 +47,10 @@ export async function buildStockAnalysis(
   // holdings are deliberately NOT here; they're fetched separately (below the fold)
   // so they don't gate the recommendation/stats first paint.
   const [bars, marketBars, profile, quote, fundRes] = await Promise.all([
-    cached(db, `ohlcv:${sym}:${range}`, TTL.ohlcv, () => data.getOHLCV(sym, range)),
-    cached(db, `ohlcv:${MARKET_TICKER}:${range}`, TTL.ohlcv, () => data.getOHLCV(MARKET_TICKER, range)),
+    cached(db, `ohlcv:${sym}:${range}`, TTL.ohlcv, () => data.getOHLCV(sym, range, env)),
+    cached(db, `ohlcv:${MARKET_TICKER}:${range}`, TTL.ohlcv, () => data.getOHLCV(MARKET_TICKER, range, env)),
     cached(db, `profile:${sym}`, TTL.profile, () => data.getProfile(sym, env)),
-    cached(db, `quote:${sym}`, TTL.quote, () => data.getQuote(sym)),
+    cached(db, `quote:${sym}`, TTL.quote, () => data.getQuote(sym, env)),
     cached(db, `fund:${sym}:full`, TTL.fundamentals, () => data.getFundamentals(sym, env, true)),
   ]);
   if (!bars.length) return null;
@@ -258,7 +258,7 @@ export async function buildScreen(
     const results = await Promise.all(
       batch.map(async (t): Promise<{ row: ScreenRow; fi: FactorInputs } | null> => {
         const sym = t.toUpperCase();
-        const bars = await cached(db, `ohlcv:${sym}:1y`, TTL.ohlcv, () => data.getOHLCV(sym, "1y"));
+        const bars = await cached(db, `ohlcv:${sym}:1y`, TTL.ohlcv, () => data.getOHLCV(sym, "1y", env));
         if (!bars.length) return null;
         const closes = bars.map((b) => b.close);
         const risk = riskMetrics(closes);

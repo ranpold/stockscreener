@@ -10,7 +10,7 @@ import { upcomingEarnings } from "./providers/earnings";
 import { getMovers } from "./providers/movers";
 import { data as dataProvider } from "./providers";
 
-const dataChart = (ticker: string, tf: string) => dataProvider.getChartBars(ticker, tf);
+const dataChart = (ticker: string, tf: string, env: Env) => dataProvider.getChartBars(ticker, tf, env);
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -143,7 +143,7 @@ app.get("/api/chart/:ticker", (c) => {
   const tf = c.req.query("range") || "1y";
   const short = tf === "1d" || tf === "5d";
   return edgeCached(c, short ? 300 : 1800, async () => {
-    const bars = await dataChart(ticker, tf);
+    const bars = await dataChart(ticker, tf, c.env);
     if (!bars.length) return { status: 404, data: { error: "no data", bars: [] } };
     return { status: 200, data: { bars } };
   });

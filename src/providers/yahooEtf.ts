@@ -22,7 +22,9 @@ export interface EtfBreakdown {
 let crumbCache: { cookie: string; crumb: string; ts: number } | null = null;
 const CRUMB_TTL = 25 * 60 * 1000;
 
-async function getCrumb(): Promise<{ cookie: string; crumb: string } | null> {
+export const YAHOO_UA = UA;
+
+export async function getCrumb(): Promise<{ cookie: string; crumb: string } | null> {
   if (crumbCache && Date.now() - crumbCache.ts < CRUMB_TTL) return crumbCache;
   try {
     const r1 = await fetch("https://fc.yahoo.com", { headers: { "User-Agent": UA } });

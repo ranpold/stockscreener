@@ -139,6 +139,13 @@ export interface EarningsEvent {
   hour: string;
 }
 
+export interface Mover {
+  symbol: string;
+  name: string;
+  price: number;
+  changePercent: number;
+}
+
 export interface Watchlist {
   id: string;
   name: string;
@@ -186,6 +193,10 @@ export const api = {
 
   earnings(): Promise<{ events: EarningsEvent[] }> {
     return getJson(`/api/earnings`);
+  },
+
+  movers(): Promise<{ gainers: Mover[]; losers: Mover[] }> {
+    return getJson(`/api/movers`);
   },
 
   news(ticker: string): Promise<{ news: NewsItem[] }> {

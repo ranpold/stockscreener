@@ -34,8 +34,10 @@ export async function upcomingEarnings(
     const list: any[] = (data?.earningsCalendar ?? []).filter((e: any) => e.symbol && e.epsEstimate != null);
     // Prefer recognizable (S&P sample) names; only fall back to the broader set
     // (large-caps with a revenue estimate) when too few big names are reporting soon.
+    // Prefer recognizable (S&P sample) names; only fall back to the broader set
+    // (large-caps with a revenue estimate) if NO known names report in the window.
     const knownEv = list.filter((e) => known.has(e.symbol));
-    const chosen = knownEv.length >= 6 ? knownEv : list.filter((e) => known.has(e.symbol) || e.revenueEstimate != null);
+    const chosen = knownEv.length > 0 ? knownEv : list.filter((e) => e.revenueEstimate != null);
     return chosen
       .slice()
       .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))

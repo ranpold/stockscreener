@@ -1,7 +1,54 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { api, fmt, type EarningsEvent } from "../api";
+import { api, fmt, type EarningsEvent, type Mover } from "../api";
 import SearchBox from "../components/SearchBox";
+
+function MoverRow({ m }: { m: Mover }) {
+  const up = m.changePercent >= 0;
+  return (
+    <Link
+      to={`/stock/${m.symbol}`}
+      className="flex items-center justify-between bg-panel2 border border-edge rounded-lg px-3 py-2 hover:border-accent transition"
+    >
+      <span className="min-w-0">
+        <span className="font-semibold text-accent">{m.symbol}</span>
+        <span className="text-muted ml-2 text-xs truncate">{m.name}</span>
+      </span>
+      <span className="text-right shrink-0">
+        <span className="text-ink tabular-nums text-sm">{fmt.money(m.price)}</span>
+        <span className={`ml-2 tabular-nums text-sm ${up ? "text-pos" : "text-neg"}`}>
+          {up ? "+" : ""}
+          {fmt.pct(m.changePercent)}
+        </span>
+      </span>
+    </Link>
+  );
+}
+
+function Movers() {
+  const { data, isLoading } = useQuery({ queryKey: ["movers"], queryFn: api.movers });
+  if (isLoading) return <div className="text-muted text-sm">Loading movers…</div>;
+  const gainers = data?.gainers ?? [];
+  const losers = data?.losers ?? [];
+  if (gainers.length === 0 && losers.length === 0)
+    return <div className="text-muted text-sm">Movers unavailable right now.</div>;
+  return (
+    <div className="grid md:grid-cols-2 gap-5">
+      <div className="space-y-2">
+        <div className="text-[11px] font-medium text-pos uppercase tracking-wide">▲ Top gainers</div>
+        {gainers.map((m) => (
+          <MoverRow key={m.symbol} m={m} />
+        ))}
+      </div>
+      <div className="space-y-2">
+        <div className="text-[11px] font-medium text-neg uppercase tracking-wide">▼ Top losers</div>
+        {losers.map((m) => (
+          <MoverRow key={m.symbol} m={m} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 const HOUR_LABEL: Record<string, string> = { bmo: "Pre-market", amc: "After close", dmh: "Mid-day" };
 
@@ -110,8 +157,16 @@ export default function Home() {
 
       <div className="space-y-3">
         <div className="flex items-baseline justify-between">
+          <h2 className="text-lg font-bold">Today's movers</h2>
+          <span className="text-xs text-muted">major stocks</span>
+        </div>
+        <Movers />
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-baseline justify-between">
           <h2 className="text-lg font-bold">Upcoming earnings</h2>
-          <span className="text-xs text-muted">major companies</span>
+          <span className="text-xs text-muted">next 3 weeks</span>
         </div>
         <EarningsCalendar />
       </div>

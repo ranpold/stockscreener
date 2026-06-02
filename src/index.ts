@@ -7,6 +7,7 @@ import { watchlistRoutes } from "./routes/watchlists";
 import { authRoutes } from "./routes/auth";
 import { searchSymbols } from "./providers/search";
 import { upcomingEarnings } from "./providers/earnings";
+import { getMovers } from "./providers/movers";
 import { data as dataProvider } from "./providers";
 
 const dataChart = (ticker: string, tf: string) => dataProvider.getChartBars(ticker, tf);
@@ -50,11 +51,19 @@ app.get("/api/health", (c) => c.json({ ok: true, time: Date.now() }));
 
 app.get("/api/universe", (c) => edgeCached(c, 86400, async () => ({ status: 200, data: { sp500: SP500 } })));
 
-// Upcoming earnings calendar (homepage).
+// Upcoming earnings calendar — next 3 weeks (homepage).
 app.get("/api/earnings", (c) =>
   edgeCached(c, 3600, async () => {
-    const events = await upcomingEarnings(c.env.FINNHUB_API_KEY ?? "", new Set(SP500));
+    const events = await upcomingEarnings(c.env.FINNHUB_API_KEY ?? "", new Set(SP500), 21);
     return { status: 200, data: { events } };
+  }),
+);
+
+// Top gainers / losers among major (S&P sample) stocks (homepage).
+app.get("/api/movers", (c) =>
+  edgeCached(c, 600, async () => {
+    const movers = await getMovers(SP500);
+    return { status: 200, data: movers };
   }),
 );
 

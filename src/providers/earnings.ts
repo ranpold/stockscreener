@@ -31,17 +31,20 @@ export async function upcomingEarnings(
     const res = await fetch(url);
     if (!res.ok) return [];
     const data: any = await res.json();
-    const list: any[] = (data?.earningsCalendar ?? []).filter((e: any) => e.symbol && e.epsEstimate != null);
-    // Prefer recognizable (S&P sample) names; only fall back to the broader set
-    // (large-caps with a revenue estimate) when too few big names are reporting soon.
-    // Prefer recognizable (S&P sample) names; only fall back to the broader set
-    // (large-caps with a revenue estimate) if NO known names report in the window.
-    const knownEv = list.filter((e) => known.has(e.symbol));
-    const chosen = knownEv.length > 0 ? knownEv : list.filter((e) => e.revenueEstimate != null);
-    return chosen
-      .slice()
-      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
-      .slice(0, 24)
+    // Analyst-covered names (EPS estimate present). Revenue estimate (when present)
+    // sizes the tile; recognizable (S&P) names sort first within a day.
+    const list: any[] = (data?.earningsCalendar ?? []).filter(
+      (e: any) => e.symbol && e.epsEstimate != null,
+    );
+    return list
+      .sort((a, b) => {
+        if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+        const ak = known.has(a.symbol) ? 0 : 1;
+        const bk = known.has(b.symbol) ? 0 : 1;
+        if (ak !== bk) return ak - bk;
+        return (b.revenueEstimate ?? 0) - (a.revenueEstimate ?? 0);
+      })
+      .slice(0, 120)
       .map((e) => ({
         date: e.date,
         symbol: e.symbol,
@@ -50,8 +53,7 @@ export async function upcomingEarnings(
         hour: e.hour ?? "",
         quarter: e.quarter,
         year: e.year,
-      }))
-      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+      }));
   } catch {
     return [];
   }

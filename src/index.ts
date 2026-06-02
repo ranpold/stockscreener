@@ -22,7 +22,7 @@ app.use("/api/*", cors());
  * Repeat views are served at the edge (~RTT) without recomputing or touching Turso.
  */
 // Bump when an API response shape changes so deploys don't serve stale cached JSON.
-const CACHE_VERSION = "6";
+const CACHE_VERSION = "10";
 
 async function edgeCached(
   c: { req: { url: string }; executionCtx: ExecutionContext },
@@ -125,11 +125,15 @@ app.get("/api/snapshots", (c) => {
   const raw = (c.req.query("tickers") || "").trim();
   if (!raw) return c.json({ snapshots: [] });
   return edgeCached(c, 300, async () => {
-    const tickers = raw.split(",").map((t) => t.trim().toUpperCase()).filter(Boolean).slice(0, 50);
-    const client = getDb(c.env);
-    await ensureSchema(client);
-    const snapshots = await buildSnapshots(client, c.env, tickers);
-    return { status: 200, data: { snapshots } };
+    try {
+      const tickers = raw.split(",").map((t) => t.trim().toUpperCase()).filter(Boolean).slice(0, 50);
+      const client = getDb(c.env);
+      await ensureSchema(client);
+      const snapshots = await buildSnapshots(client, c.env, tickers);
+      return { status: 200, data: { snapshots } };
+    } catch (e) {
+      return { status: 200, data: { snapshots: [], error: String(e) } };
+    }
   });
 });
 

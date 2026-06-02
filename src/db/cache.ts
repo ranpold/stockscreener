@@ -26,6 +26,43 @@ export async function cacheSet<T>(db: Client, key: string, value: T, ttlSeconds:
   });
 }
 
+/** Read many cached JSON values in one query. Returns a Map of key -> value (non-expired). */
+export async function cacheGetMany<T>(db: Client, keys: string[]): Promise<Map<string, T>> {
+  const out = new Map<string, T>();
+  if (!keys.length) return out;
+  const now = Date.now();
+  const placeholders = keys.map(() => "?").join(",");
+  const rs = await db.execute({
+    sql: `SELECT key, payload, expires_at FROM cache WHERE key IN (${placeholders})`,
+    args: keys,
+  });
+  for (const row of rs.rows) {
+    if (Number(row.expires_at) < now) continue;
+    try {
+      out.set(String(row.key), JSON.parse(String(row.payload)) as T);
+    } catch {
+      /* skip */
+    }
+  }
+  return out;
+}
+
+/** Write many cached JSON values in one batched round-trip. */
+export async function cacheSetMany(
+  db: Client,
+  entries: { key: string; value: unknown; ttl: number }[],
+): Promise<void> {
+  if (!entries.length) return;
+  const now = Date.now();
+  await db.batch(
+    entries.map((e) => ({
+      sql: "INSERT INTO cache (key, payload, expires_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET payload = excluded.payload, expires_at = excluded.expires_at",
+      args: [e.key, JSON.stringify(e.value), now + e.ttl * 1000],
+    })),
+    "write",
+  );
+}
+
 /** Get-or-compute helper with TTL caching. */
 export async function cached<T>(
   db: Client,
@@ -51,4 +88,5 @@ export const TTL = {
   screen: 3600, // 1 h
   news: 3600, // 1 h
   etf: 86400, // 24 h
+  snapshot: 600, // 10 min
 };

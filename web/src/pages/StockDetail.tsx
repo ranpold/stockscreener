@@ -118,7 +118,7 @@ export default function StockDetail() {
   const hasPrice = !!q || bars.length > 0;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 animate-fade-up">
       <Link to="/" className="text-accent text-sm">← Back</Link>
 
       <div className="flex flex-wrap items-end justify-between gap-2">
@@ -134,8 +134,8 @@ export default function StockDetail() {
         </div>
         {hasPrice && (
           <div className="text-right shrink-0">
-            <div className="text-xl sm:text-2xl font-semibold tabular-nums">{fmt.money(price)}</div>
-            <div className={`text-sm tabular-nums ${change >= 0 ? "text-pos" : "text-neg"}`}>
+            <div className="text-xl sm:text-2xl font-semibold num">{fmt.money(price)}</div>
+            <div className={`text-sm num ${change >= 0 ? "text-pos" : "text-neg"}`}>
               {change >= 0 ? "+" : ""}
               {fmt.num(change)} ({fmt.pct(pct)})
               <span className="text-muted ml-1.5 text-xs">{rangeLabel[range] ?? ""}</span>

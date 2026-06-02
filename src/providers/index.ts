@@ -5,7 +5,7 @@ import {
   type FundamentalMetrics,
   type RawFundamentals,
 } from "../quant/fundamental";
-import { yahooProvider } from "./yahoo";
+import { yahooProvider, yahooSparkCloses } from "./yahoo";
 import { fmpFundamentals, fmpProfile } from "./fmp";
 import { finnhubFundamentals } from "./finnhub";
 
@@ -56,6 +56,10 @@ export const data = {
 
   getChartBars(ticker: string, timeframe: string): Promise<OHLCVBar[]> {
     return yahooProvider.getChartBars(ticker, timeframe);
+  },
+
+  getSparkCloses(symbols: string[], range = "1y"): Promise<Map<string, number[]>> {
+    return yahooSparkCloses(symbols, range);
   },
 
   getQuote(ticker: string): Promise<Quote | null> {

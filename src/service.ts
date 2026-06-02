@@ -1,6 +1,6 @@
 import type { Client } from "@libsql/client/web";
 import { data, type ProviderEnv, type Range } from "./providers";
-import { cached, TTL } from "./db/cache";
+import { cached, cacheGetMany, cacheSetMany, TTL } from "./db/cache";
 import { riskMetrics, annualizedVolatility, dailyReturns, historyYears, type RiskMetrics } from "./quant/risk";
 import { technicalSnapshot, momentum, type TechnicalSnapshot } from "./quant/technical";
 import type { FundamentalMetrics, RawFundamentals } from "./quant/fundamental";
@@ -125,20 +125,20 @@ export interface Snapshot {
   pe: number | null;
 }
 
-/** Lightweight per-ticker summary for watchlist cards (lite fundamentals, no SPY/news/etf). */
-async function buildSnapshot(db: Client, env: Env, ticker: string): Promise<Snapshot | null> {
-  const sym = ticker.toUpperCase();
-  const [bars, quote, fundRes] = await Promise.all([
-    cached(db, `ohlcv:${sym}:1y`, TTL.ohlcv, () => data.getOHLCV(sym, "1y")),
-    cached(db, `quote:${sym}`, TTL.quote, () => data.getQuote(sym)),
-    cached(db, `fund:${sym}`, TTL.fundamentals, () => data.getFundamentals(sym, env, false)),
-  ]);
-  if (!bars.length) return null;
-  const closes = bars.map((b) => b.close);
+/** Compute a snapshot synchronously from prefetched closes + (optional) cached fundamentals/quote. */
+function computeSnapshot(
+  sym: string,
+  closes: number[],
+  fundRes: { metrics: FundamentalMetrics } | null,
+  quote: { name?: string; instrumentType?: string } | null,
+): Snapshot | null {
+  if (closes.length < 2) return null;
   const risk = riskMetrics(closes);
   const tech = technicalSnapshot(closes);
-  const f = fundRes.metrics;
+  const f: Partial<FundamentalMetrics> = fundRes?.metrics ?? {};
   const isEtf = (quote?.instrumentType ?? "").toUpperCase() === "ETF";
+  const last = closes[closes.length - 1];
+  const prev = closes[closes.length - 2];
   const rec = recommend({
     isEtf,
     sharpe: risk.sharpe,
@@ -152,35 +152,64 @@ async function buildSnapshot(db: Client, env: Env, ticker: string): Promise<Snap
     macd: tech.macd,
     macdSignal: tech.macdSignal,
     momentum12_1: tech.momentum12_1,
-    pe: f.pe,
-    pb: f.pb,
-    roe: f.roe,
-    netMargin: f.netMargin,
-    piotroski: f.piotroski,
+    pe: f.pe ?? null,
+    pb: f.pb ?? null,
+    roe: f.roe ?? null,
+    netMargin: f.netMargin ?? null,
+    piotroski: f.piotroski ?? null,
   });
   return {
     ticker: sym,
     name: quote?.name ?? sym,
-    price: quote?.price ?? tech.lastClose,
-    changePercent: quote?.changePercent ?? null,
+    price: last,
+    changePercent: prev ? last / prev - 1 : null,
     isEtf,
     verdict: rec.verdict,
     score: rec.score,
     sharpe: risk.sharpe,
     cagr: risk.cagr,
     momentum: tech.momentum12_1,
-    pe: f.pe,
+    pe: f.pe ?? null,
   };
 }
 
-/** Build snapshots for a list of tickers with bounded concurrency. */
-export async function buildSnapshots(db: Client, env: Env, tickers: string[]): Promise<Snapshot[]> {
+/**
+ * Build watchlist snapshots with a tight subrequest budget (Workers cap):
+ * - batched cache reads/writes (one round-trip each)
+ * - ONE Yahoo `spark` call for all missing closes (no per-ticker burst)
+ * - fundamentals/quote used only if already cached (no per-ticker FMP calls)
+ */
+export async function buildSnapshots(db: Client, _env: Env, tickers: string[]): Promise<Snapshot[]> {
+  const syms = Array.from(new Set(tickers.map((t) => t.toUpperCase())));
+  const snapMap = await cacheGetMany<Snapshot>(db, syms.map((s) => `snap:${s}`));
+  const misses = syms.filter((s) => !snapMap.has(`snap:${s}`));
+
+  if (misses.length) {
+    const [fundMap, quoteMap, closesMap] = await Promise.all([
+      cacheGetMany<{ metrics: FundamentalMetrics }>(db, misses.map((s) => `fund:${s}:full`)),
+      cacheGetMany<{ name?: string; instrumentType?: string }>(db, misses.map((s) => `quote:${s}`)),
+      data.getSparkCloses(misses, "1y"),
+    ]);
+    const toCache: { key: string; value: unknown; ttl: number }[] = [];
+    for (const s of misses) {
+      const snap = computeSnapshot(
+        s,
+        closesMap.get(s) ?? [],
+        fundMap.get(`fund:${s}:full`) ?? null,
+        quoteMap.get(`quote:${s}`) ?? null,
+      );
+      if (snap) {
+        snapMap.set(`snap:${s}`, snap);
+        toCache.push({ key: `snap:${s}`, value: snap, ttl: TTL.snapshot });
+      }
+    }
+    await cacheSetMany(db, toCache);
+  }
+
   const out: Snapshot[] = [];
-  const CONCURRENCY = 6;
-  for (let i = 0; i < tickers.length; i += CONCURRENCY) {
-    const batch = tickers.slice(i, i + CONCURRENCY);
-    const res = await Promise.all(batch.map((t) => buildSnapshot(db, env, t).catch(() => null)));
-    for (const s of res) if (s) out.push(s);
+  for (const s of syms) {
+    const snap = snapMap.get(`snap:${s}`);
+    if (snap) out.push(snap);
   }
   return out;
 }

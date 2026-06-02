@@ -28,7 +28,7 @@ function SnapshotGrid({ tickers, onRemove }: { tickers: string[]; onRemove: (t: 
         const s = byTicker.get(t);
         const up = (s?.changePercent ?? 0) >= 0;
         return (
-          <div key={t} className="relative bg-panel2 border border-edge rounded-lg p-3 hover:border-accent transition group">
+          <div key={t} className="relative bg-panel2 border border-edge rounded-xl p-3 shadow-card card-hover group">
             <button
               onClick={() => onRemove(t)}
               title="Remove"
@@ -45,9 +45,9 @@ function SnapshotGrid({ tickers, onRemove }: { tickers: string[]; onRemove: (t: 
               {s ? (
                 <>
                   <div className="flex items-baseline gap-2 mt-1.5">
-                    <span className="text-lg font-semibold tabular-nums">{fmt.money(s.price ?? undefined)}</span>
+                    <span className="text-lg font-semibold num">{fmt.money(s.price ?? undefined)}</span>
                     {s.changePercent != null && (
-                      <span className={`text-xs tabular-nums ${up ? "text-pos" : "text-neg"}`}>
+                      <span className={`text-xs num ${up ? "text-pos" : "text-neg"}`}>
                         {up ? "+" : ""}{fmt.pct(s.changePercent)}
                       </span>
                     )}
@@ -58,7 +58,7 @@ function SnapshotGrid({ tickers, onRemove }: { tickers: string[]; onRemove: (t: 
                     </span>
                     <span className="text-[11px] text-muted">Details →</span>
                   </div>
-                  <div className="flex gap-3 mt-2 text-[11px] text-muted tabular-nums">
+                  <div className="flex gap-3 mt-2 text-[11px] text-muted num">
                     <span>Sharpe {fmt.num(s.sharpe)}</span>
                     <span>P/E {fmt.num(s.pe, 1)}</span>
                     <span>Mom {fmt.pct(s.momentum)}</span>
@@ -155,7 +155,7 @@ export default function Watchlists() {
     );
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-3xl animate-fade-up">
       <div>
         <h1 className="text-xl font-bold">Watchlists</h1>
         <p className="text-muted text-sm">Your private lists of tickers. Click any ticker for analysis.</p>

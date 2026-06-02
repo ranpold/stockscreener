@@ -65,10 +65,10 @@ function Nav() {
     );
   };
   return (
-    <header className="border-b border-edge bg-panel">
+    <header className="border-b border-edge bg-panel/80 backdrop-blur-md sticky top-0 z-30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-2 sm:gap-4">
-        <Link to="/" className="font-bold text-ink tracking-tight shrink-0">
-          <span className="text-accent">◆</span> QuantScreen
+        <Link to="/" className="font-extrabold text-ink tracking-tight shrink-0 text-[15px]">
+          <span className="text-accent">◆</span> Quant<span className="text-accent">Screen</span>
         </Link>
         <nav className="flex gap-1 sm:ml-2">
           {link("/", "Search")}

@@ -48,14 +48,62 @@ function parseBars(result: any): OHLCVBar[] {
   return bars;
 }
 
+function chunk<T>(xs: T[], n: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < xs.length; i += n) out.push(xs.slice(i, i + n));
+  return out;
+}
+
+/**
+ * Batch close-price series for many tickers in one (chunked) Yahoo `spark` call —
+ * avoids firing one chart request per ticker (which trips rate limits on watchlists).
+ */
+export async function yahooSparkCloses(
+  symbols: string[],
+  range = "1y",
+): Promise<Map<string, number[]>> {
+  const out = new Map<string, number[]>();
+  const nums = (a: any[]): number[] => (a ?? []).filter((x) => typeof x === "number");
+  for (const group of chunk(symbols, 50)) {
+    const url = `${BASE}/v8/finance/spark?symbols=${group.map(encodeURIComponent).join(",")}&range=${range}&interval=1d`;
+    let data = await getJson(url);
+    if (!data) {
+      await new Promise((r) => setTimeout(r, 400));
+      data = await getJson(url);
+    }
+    if (!data) continue;
+    // Shape A: { spark: { result: [{ symbol, response:[{indicators:{quote:[{close}]}}] }] } }
+    const results = data?.spark?.result;
+    if (Array.isArray(results)) {
+      for (const r of results) {
+        const resp = r.response?.[0];
+        const closes = nums(resp?.indicators?.quote?.[0]?.close ?? resp?.close);
+        if (closes.length) out.set(r.symbol, closes);
+      }
+    } else {
+      // Shape B (flat): { SYM: { close:[...], timestamp:[...] }, ... }
+      for (const [sym, v] of Object.entries<any>(data)) {
+        const closes = nums(v?.close ?? v?.indicators?.quote?.[0]?.close);
+        if (closes.length) out.set(sym, closes);
+      }
+    }
+  }
+  return out;
+}
+
 export const yahooProvider: DataProvider = {
   name: "yahoo",
 
   // Daily bars for a coarse range — used for quant analysis (always ~1y daily).
   async getOHLCV(ticker: string, range: Range): Promise<OHLCVBar[]> {
     const url = `${BASE}/v8/finance/chart/${encodeURIComponent(ticker)}?range=${range}&interval=1d`;
-    const data = await getJson(url);
-    return parseBars(data?.chart?.result?.[0]);
+    let bars = parseBars((await getJson(url))?.chart?.result?.[0]);
+    if (!bars.length) {
+      // One retry after a short backoff to ride out a transient rate-limit.
+      await new Promise((r) => setTimeout(r, 400));
+      bars = parseBars((await getJson(url))?.chart?.result?.[0]);
+    }
+    return bars;
   },
 
   // Chart bars for a UI timeframe — intraday for short ranges (today/week).

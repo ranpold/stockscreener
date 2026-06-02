@@ -15,8 +15,8 @@ function MoverRow({ m }: { m: Mover }) {
         <span className="text-muted ml-2 text-xs truncate">{m.name}</span>
       </span>
       <span className="text-right shrink-0">
-        <span className="text-ink tabular-nums text-sm">{fmt.money(m.price)}</span>
-        <span className={`ml-2 tabular-nums text-sm ${up ? "text-pos" : "text-neg"}`}>
+        <span className="text-ink num text-sm">{fmt.money(m.price)}</span>
+        <span className={`ml-2 num text-sm ${up ? "text-pos" : "text-neg"}`}>
           {up ? "+" : ""}
           {fmt.pct(m.changePercent)}
         </span>
@@ -50,11 +50,24 @@ function Movers() {
   );
 }
 
-const HOUR_LABEL: Record<string, string> = { bmo: "Pre-market", amc: "After close", dmh: "Mid-day" };
+// A distinct hue per day column (low-alpha tint over the dark theme).
+const DAY_HUES = ["#5b8dff", "#16c784", "#a78bfa", "#f5a623", "#22d3ee", "#fb7185", "#34d399"];
 
-function fmtDate(d: string): string {
+function dayHeader(d: string): { weekday: string; date: string } {
   const dt = new Date(d + "T00:00:00");
-  return dt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  return {
+    weekday: dt.toLocaleDateString(undefined, { weekday: "long" }),
+    date: dt.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+  };
+}
+
+// Tile size tier from estimated annual revenue (proxy for company size).
+function tier(rev: number | null): { pad: string; ticker: string; showName: boolean } {
+  const r = rev ?? 0;
+  if (r >= 30e9) return { pad: "py-5", ticker: "text-2xl", showName: true };
+  if (r >= 8e9) return { pad: "py-4", ticker: "text-xl", showName: true };
+  if (r >= 1.5e9) return { pad: "py-3", ticker: "text-base", showName: false };
+  return { pad: "py-2", ticker: "text-sm", showName: false };
 }
 
 function EarningsCalendar() {
@@ -63,34 +76,48 @@ function EarningsCalendar() {
   if (isLoading) return <div className="text-muted text-sm">Loading earnings…</div>;
   if (events.length === 0) return <div className="text-muted text-sm">No upcoming earnings found.</div>;
 
-  // Group by date.
   const byDate = new Map<string, EarningsEvent[]>();
-  for (const e of events.slice(0, 24)) {
+  for (const e of events) {
     if (!byDate.has(e.date)) byDate.set(e.date, []);
     byDate.get(e.date)!.push(e);
   }
+  const days = [...byDate.entries()].slice(0, 8);
+
   return (
-    <div className="space-y-4">
-      {[...byDate.entries()].map(([date, evs]) => (
-        <div key={date}>
-          <div className="text-[11px] font-medium text-muted uppercase tracking-wide mb-1.5">{fmtDate(date)}</div>
-          <div className="grid sm:grid-cols-2 gap-2">
-            {evs.map((e) => (
-              <Link
-                key={e.symbol}
-                to={`/stock/${e.symbol}`}
-                className="flex items-center justify-between bg-panel2 border border-edge rounded-lg px-3 py-2 hover:border-accent transition"
-              >
-                <span className="font-semibold text-accent">{e.symbol}</span>
-                <span className="text-xs text-muted flex items-center gap-2">
-                  {e.epsEstimate != null && <span>EPS est {fmt.money(e.epsEstimate)}</span>}
-                  {HOUR_LABEL[e.hour] && <span className="bg-edge px-1.5 py-0.5 rounded">{HOUR_LABEL[e.hour]}</span>}
-                </span>
-              </Link>
-            ))}
+    <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 pb-1">
+      {days.map(([date, evs], i) => {
+        const hue = DAY_HUES[i % DAY_HUES.length];
+        const { weekday, date: dlabel } = dayHeader(date);
+        return (
+          <div
+            key={date}
+            className="shrink-0 w-[200px] rounded-xl border border-edge overflow-hidden flex flex-col"
+            style={{ background: `linear-gradient(180deg, ${hue}1f, ${hue}0a)` }}
+          >
+            <div className="px-3 py-2 border-b" style={{ borderColor: `${hue}33` }}>
+              <div className="text-sm font-bold" style={{ color: hue }}>{weekday}</div>
+              <div className="text-[11px] text-muted">{dlabel} · {evs.length}</div>
+            </div>
+            <div className="p-2 flex flex-col gap-2">
+              {evs.map((e) => {
+                const t = tier(e.revenueEstimate);
+                return (
+                  <Link
+                    key={e.symbol}
+                    to={`/stock/${e.symbol}`}
+                    className={`block rounded-lg bg-panel2/80 border border-edge/60 px-3 ${t.pad} hover:border-accent hover:bg-panel2 transition`}
+                  >
+                    <div className={`font-extrabold tracking-tight leading-none num ${t.ticker}`}>{e.symbol}</div>
+                    {t.showName && e.epsEstimate != null && (
+                      <div className="text-[10px] text-muted mt-1">EPS est {fmt.money(e.epsEstimate)}</div>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -132,9 +159,9 @@ function Chips({ items }: { items: { symbol: string; label: string }[] }) {
 
 export default function Home() {
   return (
-    <div className="max-w-3xl mx-auto space-y-8 pt-6">
+    <div className="max-w-3xl mx-auto space-y-8 pt-6 animate-fade-up">
       <div className="text-center space-y-1">
-        <h1 className="text-2xl font-bold">Quant analysis on any stock or ETF</h1>
+        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Quant analysis on any stock or ETF</h1>
         <p className="text-muted text-sm">
           Search a name or ticker for a full risk, technical, valuation, factor, and
           recommendation breakdown — plus the latest news.

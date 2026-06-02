@@ -43,12 +43,19 @@ function Bar({ label, score }: { label: string; score: number | null }) {
 }
 
 export default function RecommendationPanel({ rec, isEtf }: { rec: Recommendation; isEtf: boolean }) {
+  const hue = rec.score >= 62 ? "#16c784" : rec.score >= 45 ? "#f5a623" : "#ea3943";
   return (
-    <div className="bg-panel border border-edge rounded-lg p-4">
+    <div
+      className="border border-edge rounded-2xl p-4 shadow-card"
+      style={{ background: `linear-gradient(135deg, ${hue}1f, ${hue}08 40%, #111726 75%)` }}
+    >
       <div className="flex flex-wrap items-center gap-4">
-        <div className="text-center">
-          <div className={`text-4xl font-bold tabular-nums ${scoreColor(rec.score)}`}>{rec.score}</div>
-          <div className="text-[11px] text-muted">/ 100</div>
+        <div
+          className="text-center shrink-0 rounded-2xl px-4 py-3"
+          style={{ background: `${hue}1a`, border: `1px solid ${hue}40` }}
+        >
+          <div className={`text-4xl font-bold num leading-none ${scoreColor(rec.score)}`}>{rec.score}</div>
+          <div className="text-[11px] text-muted mt-1">/ 100</div>
         </div>
         <div>
           <span className={`inline-block px-3 py-1 rounded-md border text-sm font-semibold ${VERDICT_STYLE[rec.verdict]}`}>

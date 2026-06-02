@@ -64,7 +64,11 @@ export async function yahooSparkCloses(
 ): Promise<Map<string, number[]>> {
   const out = new Map<string, number[]>();
   const nums = (a: any[]): number[] => (a ?? []).filter((x) => typeof x === "number");
-  for (const group of chunk(symbols, 50)) {
+  // Yahoo spark caps symbols per request, so use small chunks with light pacing.
+  const groups = chunk(symbols, 15);
+  for (let gi = 0; gi < groups.length; gi++) {
+    const group = groups[gi];
+    if (gi > 0) await new Promise((r) => setTimeout(r, 120));
     const url = `${BASE}/v8/finance/spark?symbols=${group.map(encodeURIComponent).join(",")}&range=${range}&interval=1d`;
     let data = await getJson(url);
     if (!data) {

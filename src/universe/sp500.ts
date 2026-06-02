@@ -30,3 +30,20 @@ export const SP500_SAMPLE: string[] = [
 
 // Deduped, in case of accidental repeats above.
 export const SP500: string[] = Array.from(new Set(SP500_SAMPLE));
+
+// Popular ETFs (broad, sector, factor, bonds, gold) — included in Ideas.
+export const ETF_UNIVERSE: string[] = [
+  "SPY", "QQQ", "VTI", "VOO", "IWM", "DIA", "VUG", "VTV", "SCHD",
+  "SMH", "XLK", "XLF", "XLE", "XLV", "ARKK", "TLT", "GLD",
+];
+
+// Higher-volatility growth / momentum names for the High-risk bucket.
+export const HIGH_VOL: string[] = [
+  "TSLA", "COIN", "PLTR", "MSTR", "SMCI", "MARA", "RIOT", "SOFI",
+  "RBLX", "SNOW", "NET", "DKNG", "AFRM", "UPST", "ROKU", "ARM",
+];
+
+// Universe scanned for the Ideas tab.
+export const IDEAS_UNIVERSE: string[] = Array.from(
+  new Set([...SP500, ...ETF_UNIVERSE, ...HIGH_VOL]),
+);

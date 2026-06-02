@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { getDb, ensureSchema } from "./db/client";
-import { buildStockAnalysis, buildScreen, buildSnapshots, getNews, getEtf, type Env, type ScreenFilters } from "./service";
-import { SP500 } from "./universe/sp500";
+import { buildStockAnalysis, buildScreen, buildSnapshots, buildIdeas, getNews, getEtf, type Env, type ScreenFilters } from "./service";
+import { SP500, IDEAS_UNIVERSE } from "./universe/sp500";
 import { watchlistRoutes } from "./routes/watchlists";
 import { authRoutes } from "./routes/auth";
 import { searchSymbols } from "./providers/search";
@@ -22,7 +22,7 @@ app.use("/api/*", cors());
  * Repeat views are served at the edge (~RTT) without recomputing or touching Turso.
  */
 // Bump when an API response shape changes so deploys don't serve stale cached JSON.
-const CACHE_VERSION = "10";
+const CACHE_VERSION = "12";
 
 async function edgeCached(
   c: { req: { url: string }; executionCtx: ExecutionContext },
@@ -119,6 +119,20 @@ app.get("/api/etf/:ticker", (c) => {
     return { status: 200, data: { etf } };
   });
 });
+
+// Ideas to invest now, grouped by risk level (Low/Medium/High), incl. ETFs.
+app.get("/api/ideas", (c) =>
+  edgeCached(c, 3600, async () => {
+    try {
+      const client = getDb(c.env);
+      await ensureSchema(client);
+      const ideas = await buildIdeas(client, c.env, IDEAS_UNIVERSE);
+      return { status: 200, data: ideas };
+    } catch (e) {
+      return { status: 200, data: { low: [], medium: [], high: [], error: String(e) } };
+    }
+  }),
+);
 
 // Lightweight snapshots for a set of tickers (watchlist cards).
 app.get("/api/snapshots", (c) => {

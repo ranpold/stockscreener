@@ -157,7 +157,14 @@ export interface Snapshot {
   sharpe: number;
   cagr: number;
   momentum: number;
+  volatility: number;
   pe: number | null;
+}
+
+export interface Ideas {
+  low: Snapshot[];
+  medium: Snapshot[];
+  high: Snapshot[];
 }
 
 export interface Watchlist {
@@ -215,6 +222,10 @@ export const api = {
 
   snapshots(tickers: string[]): Promise<{ snapshots: Snapshot[] }> {
     return getJson(`/api/snapshots?tickers=${encodeURIComponent(tickers.join(","))}`);
+  },
+
+  ideas(): Promise<Ideas> {
+    return getJson(`/api/ideas`);
   },
 
   news(ticker: string): Promise<{ news: NewsItem[] }> {

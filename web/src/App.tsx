@@ -4,6 +4,7 @@ import { api } from "./api";
 import Screener from "./pages/Screener";
 import StockDetail from "./pages/StockDetail";
 import Watchlists from "./pages/Watchlists";
+import Ideas from "./pages/Ideas";
 
 function AuthControl() {
   const qc = useQueryClient();
@@ -72,6 +73,7 @@ function Nav() {
         </Link>
         <nav className="flex gap-1 sm:ml-2">
           {link("/", "Search")}
+          {link("/ideas", "Ideas")}
           {link("/watchlists", "Watchlists")}
         </nav>
         <div className="ml-auto">
@@ -89,6 +91,7 @@ export default function App() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-6">
         <Routes>
           <Route path="/" element={<Screener />} />
+          <Route path="/ideas" element={<Ideas />} />
           <Route path="/stock/:ticker" element={<StockDetail />} />
           <Route path="/watchlists" element={<Watchlists />} />
         </Routes>

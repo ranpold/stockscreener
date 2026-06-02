@@ -122,6 +122,7 @@ export interface Snapshot {
   sharpe: number;
   cagr: number;
   momentum: number;
+  volatility: number;
   pe: number | null;
 }
 
@@ -169,6 +170,7 @@ function computeSnapshot(
     sharpe: risk.sharpe,
     cagr: risk.cagr,
     momentum: tech.momentum12_1,
+    volatility: risk.annualizedVolatility,
     pe: f.pe ?? null,
   };
 }
@@ -212,6 +214,31 @@ export async function buildSnapshots(db: Client, _env: Env, tickers: string[]): 
     if (snap) out.push(snap);
   }
   return out;
+}
+
+export interface IdeasResult {
+  low: Snapshot[];
+  medium: Snapshot[];
+  high: Snapshot[];
+}
+
+/**
+ * "Ideas to invest now": scan the ideas universe, classify each by volatility
+ * (annualized) into Low/Medium/High risk, and take the top picks per bucket by
+ * recommendation score. ETFs surface naturally in the Low/Medium tiers.
+ */
+export async function buildIdeas(db: Client, env: Env, universe: string[]): Promise<IdeasResult> {
+  const snaps = await buildSnapshots(db, env, universe);
+  const low: Snapshot[] = [];
+  const medium: Snapshot[] = [];
+  const high: Snapshot[] = [];
+  for (const s of snaps) {
+    if (s.volatility < 0.25) low.push(s);
+    else if (s.volatility <= 0.45) medium.push(s);
+    else high.push(s);
+  }
+  const top = (arr: Snapshot[], n: number) => arr.sort((a, b) => b.score - a.score).slice(0, n);
+  return { low: top(low, 10), medium: top(medium, 10), high: top(high, 10) };
 }
 
 export interface ScreenRow {

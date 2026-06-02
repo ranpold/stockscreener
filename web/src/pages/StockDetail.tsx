@@ -78,6 +78,29 @@ export default function StockDetail() {
   const tones = (x: number | null | undefined) =>
     x === null || x === undefined ? "neutral" : x >= 0 ? "pos" : "neg";
 
+  // Price + change aligned to the selected timeframe (like Robinhood).
+  // "Today" uses the quote (vs previous close); other periods use first->last of the series.
+  const bars = chartQuery.data?.bars ?? [];
+  const rangeLabel: Record<string, string> = {
+    "1d": "Today",
+    "5d": "Past week",
+    "1mo": "Past month",
+    "3mo": "Past 3 months",
+    "6mo": "Past 6 months",
+    "1y": "Past year",
+    "5y": "Past 5 years",
+  };
+  let price = q?.price ?? 0;
+  let change = q?.change ?? 0;
+  let pct = q?.changePercent ?? 0;
+  if (range !== "1d" && bars.length > 1) {
+    price = bars[bars.length - 1].close;
+    const first = bars[0].close;
+    change = price - first;
+    pct = first ? change / first : 0;
+  }
+  const hasPrice = !!q || bars.length > 0;
+
   return (
     <div className="space-y-5">
       <Link to="/" className="text-accent text-sm">← Back</Link>
@@ -93,12 +116,13 @@ export default function StockDetail() {
           </h1>
           {data.sector && <div className="text-muted text-sm">{data.sector}</div>}
         </div>
-        {q && (
+        {hasPrice && (
           <div className="text-right shrink-0">
-            <div className="text-xl sm:text-2xl font-semibold tabular-nums">{fmt.money(q.price)}</div>
-            <div className={`text-sm tabular-nums ${q.change >= 0 ? "text-pos" : "text-neg"}`}>
-              {q.change >= 0 ? "+" : ""}
-              {fmt.num(q.change)} ({fmt.pct(q.changePercent)})
+            <div className="text-xl sm:text-2xl font-semibold tabular-nums">{fmt.money(price)}</div>
+            <div className={`text-sm tabular-nums ${change >= 0 ? "text-pos" : "text-neg"}`}>
+              {change >= 0 ? "+" : ""}
+              {fmt.num(change)} ({fmt.pct(pct)})
+              <span className="text-muted ml-1.5 text-xs">{rangeLabel[range] ?? ""}</span>
             </div>
           </div>
         )}

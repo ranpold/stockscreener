@@ -12,6 +12,10 @@ routes = [
 # Keep the workers.dev URL working too (fallback / old links).
 workers_dev = true
 
+# Prewarm Ideas fundamentals every 6h (rotating batch).
+[triggers]
+crons = ["0 */6 * * *"]
+
 # Build the React frontend before deploy (runs in Cloudflare Workers Builds CI
 # and locally on `wrangler deploy`/`dev`), producing web/dist for the assets.
 [build]

@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api, fmt, type Snapshot } from "../api";
+
+type RiskFilter = "all" | "high" | "medium" | "low";
 
 const VERDICT_STYLE: Record<Snapshot["verdict"], string> = {
   "Strong Buy": "bg-pos/20 text-pos",
@@ -78,9 +81,18 @@ function RiskSection({
 
 export default function Ideas() {
   const { data, isLoading, isError } = useQuery({ queryKey: ["ideas"], queryFn: api.ideas });
+  const [filter, setFilter] = useState<RiskFilter>("all");
+
+  const tabs: { key: RiskFilter; label: string }[] = [
+    { key: "all", label: "All" },
+    { key: "high", label: "High risk" },
+    { key: "medium", label: "Medium" },
+    { key: "low", label: "Low" },
+  ];
+  const show = (k: RiskFilter) => filter === "all" || filter === k;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 animate-fade-up">
+    <div className="max-w-5xl mx-auto space-y-6 animate-fade-up">
       <div>
         <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Ideas to invest now</h1>
         <p className="text-muted text-sm mt-1">
@@ -88,15 +100,29 @@ export default function Ideas() {
         </p>
       </div>
 
+      <div className="flex gap-1.5 flex-wrap">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setFilter(t.key)}
+            className={`text-sm px-3 py-1.5 rounded-lg font-medium transition ${
+              filter === t.key ? "bg-accent text-white" : "bg-panel2 border border-edge text-muted hover:text-ink"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       {isLoading && <div className="text-muted text-sm py-8 text-center">Scanning the market…</div>}
       {isError && <div className="text-neg text-sm py-8 text-center">Couldn't load ideas. Try again.</div>}
 
       {data && (
-        <>
-          <RiskSection title="Low" subtitle="steadier · vol < 25%" hue="#16c784" picks={data.low} />
-          <RiskSection title="Medium" subtitle="balanced · vol 25–45%" hue="#f5a623" picks={data.medium} />
-          <RiskSection title="High" subtitle="aggressive · vol > 45%" hue="#ea3943" picks={data.high} />
-        </>
+        <div className="space-y-8">
+          {show("high") && <RiskSection title="High" subtitle="aggressive · vol > 45%" hue="#ea3943" picks={data.high} />}
+          {show("medium") && <RiskSection title="Medium" subtitle="balanced · vol 25–45%" hue="#f5a623" picks={data.medium} />}
+          {show("low") && <RiskSection title="Low" subtitle="steadier · vol < 25%" hue="#16c784" picks={data.low} />}
+        </div>
       )}
 
       <p className="text-[11px] text-muted border-t border-edge pt-3">

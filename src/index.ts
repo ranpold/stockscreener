@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { getDb, ensureSchema } from "./db/client";
-import { buildStockAnalysis, buildScreen, buildSnapshots, buildIdeas, getNews, getEtf, type Env, type ScreenFilters } from "./service";
+import { buildStockAnalysis, buildScreen, buildSnapshots, buildIdeas, prewarmFundamentals, getNews, getEtf, type Env, type ScreenFilters } from "./service";
 import { SP500, IDEAS_UNIVERSE } from "./universe/sp500";
 import { watchlistRoutes } from "./routes/watchlists";
 import { authRoutes } from "./routes/auth";
@@ -214,4 +214,13 @@ app.get("*", async (c) => {
   return c.env.ASSETS.fetch(c.req.raw);
 });
 
-export default app;
+export default {
+  fetch: app.fetch,
+  // Cron: rotate through the ideas universe warming fundamentals so Ideas stays
+  // fundamentals-aware and instant. Scheduled via [triggers] in wrangler.toml.
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
+    const db = getDb(env);
+    await ensureSchema(db);
+    ctx.waitUntil(prewarmFundamentals(db, env, IDEAS_UNIVERSE, 30));
+  },
+};

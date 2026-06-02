@@ -187,8 +187,9 @@ export async function buildSnapshots(db: Client, _env: Env, tickers: string[]): 
   const misses = syms.filter((s) => !snapMap.has(`snap:${s}`));
 
   if (misses.length) {
-    const [fundMap, quoteMap, closesMap] = await Promise.all([
+    const [fundFull, fundLite, quoteMap, closesMap] = await Promise.all([
       cacheGetMany<{ metrics: FundamentalMetrics }>(db, misses.map((s) => `fund:${s}:full`)),
+      cacheGetMany<{ metrics: FundamentalMetrics }>(db, misses.map((s) => `fund:${s}`)),
       cacheGetMany<{ name?: string; instrumentType?: string }>(db, misses.map((s) => `quote:${s}`)),
       data.getSparkCloses(misses, "1y"),
     ]);
@@ -197,7 +198,7 @@ export async function buildSnapshots(db: Client, _env: Env, tickers: string[]): 
       const snap = computeSnapshot(
         s,
         closesMap.get(s) ?? [],
-        fundMap.get(`fund:${s}:full`) ?? null,
+        fundFull.get(`fund:${s}:full`) ?? fundLite.get(`fund:${s}`) ?? null,
         quoteMap.get(`quote:${s}`) ?? null,
       );
       if (snap) {
@@ -214,6 +215,41 @@ export async function buildSnapshots(db: Client, _env: Env, tickers: string[]): 
     if (snap) out.push(snap);
   }
   return out;
+}
+
+/**
+ * Cron prewarm: warm a rotating batch of the universe's (lite) fundamentals so the
+ * Ideas scan is fundamentals-aware and instant. Subrequest-frugal: one batched
+ * cache read + per-miss FMP fetch + one batched cache write. Advances a cursor.
+ */
+export async function prewarmFundamentals(
+  db: Client,
+  env: Env,
+  universe: string[],
+  batchSize = 30,
+): Promise<{ warmed: number; cursor: number }> {
+  const curMap = await cacheGetMany<number>(db, ["prewarm:cursor"]);
+  let cursor = curMap.get("prewarm:cursor") ?? 0;
+  if (cursor >= universe.length) cursor = 0;
+  const batch = universe.slice(cursor, cursor + batchSize).map((t) => t.toUpperCase());
+  const have = await cacheGetMany<unknown>(db, batch.map((s) => `fund:${s}`));
+  const misses = batch.filter((s) => !have.has(`fund:${s}`));
+
+  const results = await Promise.all(
+    misses.map(async (sym) => {
+      try {
+        return { sym, f: await data.getFundamentals(sym, env, false) };
+      } catch {
+        return null;
+      }
+    }),
+  );
+  const toCache: { key: string; value: unknown; ttl: number }[] = [];
+  for (const r of results) if (r) toCache.push({ key: `fund:${r.sym}`, value: r.f, ttl: TTL.fundamentals });
+  const next = cursor + batchSize >= universe.length ? 0 : cursor + batchSize;
+  toCache.push({ key: "prewarm:cursor", value: next, ttl: 86400 * 7 });
+  await cacheSetMany(db, toCache);
+  return { warmed: toCache.length - 1, cursor };
 }
 
 export interface IdeasResult {

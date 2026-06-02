@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api, fmt, type EarningsEvent, type Mover } from "../api";
@@ -73,6 +74,23 @@ function tier(rev: number | null): { pad: string; ticker: string; showName: bool
 function EarningsCalendar() {
   const { data, isLoading } = useQuery({ queryKey: ["earnings"], queryFn: api.earnings });
   const events = data?.events ?? [];
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canLeft, setCanLeft] = useState(false);
+  const [canRight, setCanRight] = useState(false);
+
+  const updateArrows = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanLeft(el.scrollLeft > 4);
+    setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  };
+  useEffect(() => {
+    updateArrows();
+    const onResize = () => updateArrows();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [events.length]);
+
   if (isLoading) return <div className="text-muted text-sm">Loading earnings…</div>;
   if (events.length === 0) return <div className="text-muted text-sm">No upcoming earnings found.</div>;
 
@@ -81,43 +99,75 @@ function EarningsCalendar() {
     if (!byDate.has(e.date)) byDate.set(e.date, []);
     byDate.get(e.date)!.push(e);
   }
-  const days = [...byDate.entries()].slice(0, 8);
+  const days = [...byDate.entries()].slice(0, 10);
+  const scrollBy = (dx: number) => scrollRef.current?.scrollBy({ left: dx, behavior: "smooth" });
 
   return (
-    <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 pb-1">
-      {days.map(([date, evs], i) => {
-        const hue = DAY_HUES[i % DAY_HUES.length];
-        const { weekday, date: dlabel } = dayHeader(date);
-        return (
-          <div
-            key={date}
-            className="shrink-0 w-[200px] rounded-xl border border-edge overflow-hidden flex flex-col"
-            style={{ background: `linear-gradient(180deg, ${hue}1f, ${hue}0a)` }}
+    <div className="relative">
+      <div
+        ref={scrollRef}
+        onScroll={updateArrows}
+        className="flex gap-3 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 pb-1"
+      >
+        {days.map(([date, evs], i) => {
+          const hue = DAY_HUES[i % DAY_HUES.length];
+          const { weekday, date: dlabel } = dayHeader(date);
+          return (
+            <div
+              key={date}
+              className="shrink-0 w-[200px] rounded-xl border border-edge overflow-hidden flex flex-col"
+              style={{ background: `linear-gradient(180deg, ${hue}1f, ${hue}0a)` }}
+            >
+              <div className="px-3 py-2 border-b" style={{ borderColor: `${hue}33` }}>
+                <div className="text-sm font-bold" style={{ color: hue }}>{weekday}</div>
+                <div className="text-[11px] text-muted">{dlabel} · {evs.length}</div>
+              </div>
+              <div className="p-2 flex flex-col gap-2">
+                {evs.map((e) => {
+                  const t = tier(e.revenueEstimate);
+                  return (
+                    <Link
+                      key={e.symbol}
+                      to={`/stock/${e.symbol}`}
+                      className={`block rounded-lg bg-panel2/80 border border-edge/60 px-3 ${t.pad} hover:border-accent hover:bg-panel2 transition`}
+                    >
+                      <div className={`font-extrabold tracking-tight leading-none num ${t.ticker}`}>{e.symbol}</div>
+                      {t.showName && e.epsEstimate != null && (
+                        <div className="text-[10px] text-muted mt-1">EPS est {fmt.money(e.epsEstimate)}</div>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {canLeft && (
+        <>
+          <div className="pointer-events-none absolute left-0 inset-y-0 w-14 bg-gradient-to-r from-bg to-transparent" />
+          <button
+            onClick={() => scrollBy(-440)}
+            aria-label="Scroll left"
+            className="absolute left-1 top-1/2 -translate-y-1/2 z-10 w-9 h-9 grid place-items-center rounded-full bg-panel2/95 border border-edge text-accent shadow-card hover:border-accent transition"
           >
-            <div className="px-3 py-2 border-b" style={{ borderColor: `${hue}33` }}>
-              <div className="text-sm font-bold" style={{ color: hue }}>{weekday}</div>
-              <div className="text-[11px] text-muted">{dlabel} · {evs.length}</div>
-            </div>
-            <div className="p-2 flex flex-col gap-2">
-              {evs.map((e) => {
-                const t = tier(e.revenueEstimate);
-                return (
-                  <Link
-                    key={e.symbol}
-                    to={`/stock/${e.symbol}`}
-                    className={`block rounded-lg bg-panel2/80 border border-edge/60 px-3 ${t.pad} hover:border-accent hover:bg-panel2 transition`}
-                  >
-                    <div className={`font-extrabold tracking-tight leading-none num ${t.ticker}`}>{e.symbol}</div>
-                    {t.showName && e.epsEstimate != null && (
-                      <div className="text-[10px] text-muted mt-1">EPS est {fmt.money(e.epsEstimate)}</div>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
+            ‹
+          </button>
+        </>
+      )}
+      {canRight && (
+        <>
+          <div className="pointer-events-none absolute right-0 inset-y-0 w-14 bg-gradient-to-l from-bg to-transparent" />
+          <button
+            onClick={() => scrollBy(440)}
+            aria-label="Scroll right"
+            className="absolute right-1 top-1/2 -translate-y-1/2 z-10 w-9 h-9 grid place-items-center rounded-full bg-panel2/95 border border-edge text-accent shadow-card hover:border-accent transition"
+          >
+            ›
+          </button>
+        </>
+      )}
     </div>
   );
 }

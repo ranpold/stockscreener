@@ -33,6 +33,7 @@ export interface DataProvider {
   name: string;
   getQuote(ticker: string): Promise<Quote | null>;
   getOHLCV(ticker: string, range: Range): Promise<OHLCVBar[]>;
+  getChartBars(ticker: string, timeframe: string): Promise<OHLCVBar[]>;
   getFundamentals(ticker: string): Promise<RawFundamentals | null>;
   getProfile(ticker: string): Promise<Profile | null>;
 }

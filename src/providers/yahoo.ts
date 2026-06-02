@@ -15,31 +15,55 @@ async function getJson(url: string): Promise<any | null> {
   }
 }
 
+// Chart timeframe -> Yahoo (range, interval). Short ranges use intraday bars.
+const CHART_PARAMS: Record<string, { range: string; interval: string }> = {
+  "1d": { range: "1d", interval: "5m" },
+  "5d": { range: "5d", interval: "30m" },
+  "1mo": { range: "1mo", interval: "1d" },
+  "3mo": { range: "3mo", interval: "1d" },
+  "6mo": { range: "6mo", interval: "1d" },
+  "1y": { range: "1y", interval: "1d" },
+  "2y": { range: "2y", interval: "1d" },
+  "5y": { range: "5y", interval: "1wk" },
+};
+
+function parseBars(result: any): OHLCVBar[] {
+  if (!result) return [];
+  const ts: number[] = result.timestamp ?? [];
+  const q = result.indicators?.quote?.[0] ?? {};
+  const adj = result.indicators?.adjclose?.[0]?.adjclose;
+  const bars: OHLCVBar[] = [];
+  for (let i = 0; i < ts.length; i++) {
+    const close = adj?.[i] ?? q.close?.[i];
+    if (close == null) continue;
+    bars.push({
+      time: ts[i],
+      open: q.open?.[i] ?? close,
+      high: q.high?.[i] ?? close,
+      low: q.low?.[i] ?? close,
+      close,
+      volume: q.volume?.[i] ?? 0,
+    });
+  }
+  return bars;
+}
+
 export const yahooProvider: DataProvider = {
   name: "yahoo",
 
+  // Daily bars for a coarse range — used for quant analysis (always ~1y daily).
   async getOHLCV(ticker: string, range: Range): Promise<OHLCVBar[]> {
     const url = `${BASE}/v8/finance/chart/${encodeURIComponent(ticker)}?range=${range}&interval=1d`;
     const data = await getJson(url);
-    const result = data?.chart?.result?.[0];
-    if (!result) return [];
-    const ts: number[] = result.timestamp ?? [];
-    const q = result.indicators?.quote?.[0] ?? {};
-    const adj = result.indicators?.adjclose?.[0]?.adjclose;
-    const bars: OHLCVBar[] = [];
-    for (let i = 0; i < ts.length; i++) {
-      const close = adj?.[i] ?? q.close?.[i];
-      if (close == null) continue;
-      bars.push({
-        time: ts[i],
-        open: q.open?.[i] ?? close,
-        high: q.high?.[i] ?? close,
-        low: q.low?.[i] ?? close,
-        close,
-        volume: q.volume?.[i] ?? 0,
-      });
-    }
-    return bars;
+    return parseBars(data?.chart?.result?.[0]);
+  },
+
+  // Chart bars for a UI timeframe — intraday for short ranges (today/week).
+  async getChartBars(ticker: string, timeframe: string): Promise<OHLCVBar[]> {
+    const p = CHART_PARAMS[timeframe] ?? CHART_PARAMS["1y"];
+    const url = `${BASE}/v8/finance/chart/${encodeURIComponent(ticker)}?range=${p.range}&interval=${p.interval}`;
+    const data = await getJson(url);
+    return parseBars(data?.chart?.result?.[0]);
   },
 
   async getQuote(ticker: string): Promise<Quote | null> {

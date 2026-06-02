@@ -54,6 +54,10 @@ export const data = {
     return yahooProvider.getOHLCV(ticker, range);
   },
 
+  getChartBars(ticker: string, timeframe: string): Promise<OHLCVBar[]> {
+    return yahooProvider.getChartBars(ticker, timeframe);
+  },
+
   getQuote(ticker: string): Promise<Quote | null> {
     return yahooProvider.getQuote(ticker);
   },

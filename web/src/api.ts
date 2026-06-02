@@ -104,6 +104,20 @@ export interface SearchResult {
   type?: string;
 }
 
+export interface EtfHolding {
+  symbol: string;
+  name: string;
+  weight: number;
+}
+export interface EtfSector {
+  sector: string;
+  weight: number;
+}
+export interface EtfBreakdown {
+  holdings: EtfHolding[];
+  sectors: EtfSector[];
+}
+
 export interface StockAnalysis {
   ticker: string;
   name: string;
@@ -115,7 +129,7 @@ export interface StockAnalysis {
   fundamental: FundamentalMetrics;
   recommendation: Recommendation;
   news: NewsItem[];
-  ohlcv: OHLCVBar[];
+  etf: EtfBreakdown | null;
 }
 
 export interface Watchlist {
@@ -155,8 +169,12 @@ export const api = {
     return getJson(`/api/screen?${p.toString()}`);
   },
 
-  stock(ticker: string, range = "1y"): Promise<StockAnalysis> {
-    return getJson(`/api/stock/${encodeURIComponent(ticker)}?range=${range}`);
+  stock(ticker: string): Promise<StockAnalysis> {
+    return getJson(`/api/stock/${encodeURIComponent(ticker)}`);
+  },
+
+  chart(ticker: string, range: string): Promise<{ bars: OHLCVBar[] }> {
+    return getJson(`/api/chart/${encodeURIComponent(ticker)}?range=${range}`);
   },
 
   search(q: string): Promise<{ results: SearchResult[] }> {

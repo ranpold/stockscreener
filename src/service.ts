@@ -6,6 +6,7 @@ import { technicalSnapshot, momentum, type TechnicalSnapshot } from "./quant/tec
 import type { FundamentalMetrics, RawFundamentals } from "./quant/fundamental";
 import { recommend, type Recommendation } from "./quant/recommendation";
 import { companyNews, type NewsItem } from "./providers/news";
+import { getEtfBreakdown, type EtfBreakdown } from "./providers/yahooEtf";
 import { computeFactorScores, type FactorScores, type FactorInputs } from "./quant/factor";
 
 export interface Env extends ProviderEnv {
@@ -30,7 +31,7 @@ export interface StockAnalysis {
   fundamental: FundamentalMetrics;
   recommendation: Recommendation;
   news: NewsItem[];
-  ohlcv: { time: number; open: number; high: number; low: number; close: number; volume: number }[];
+  etf: EtfBreakdown | null;
   raw: RawFundamentals | null;
 }
 
@@ -64,6 +65,9 @@ export async function buildStockAnalysis(
   ]);
 
   const isEtf = (quote?.instrumentType ?? "").toUpperCase() === "ETF";
+  const etf = isEtf
+    ? await cached(db, `etf:${sym}`, TTL.etf, () => getEtfBreakdown(sym))
+    : null;
   const risk = riskMetrics(closes, marketCloses);
   const technical = technicalSnapshot(closes);
   const f = fundRes.metrics;
@@ -101,7 +105,7 @@ export async function buildStockAnalysis(
     fundamental: f,
     recommendation,
     news,
-    ohlcv: bars,
+    etf,
     raw: fundRes.raw,
   };
 }

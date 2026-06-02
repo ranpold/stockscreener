@@ -1,6 +1,6 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { api, fmt, type StockAnalysis } from "../api";
 import MetricCard from "../components/MetricCard";
 import RecommendationPanel from "../components/RecommendationPanel";
@@ -8,21 +8,39 @@ import RecommendationPanel from "../components/RecommendationPanel";
 // Lazy-loaded so lightweight-charts isn't in the initial bundle.
 const PriceChart = lazy(() => import("../components/PriceChart"));
 
-type Tab = "risk" | "technical" | "valuation" | "factor";
+type Tab = "risk" | "technical" | "valuation" | "holdings" | "factor";
 
-const RANGES = ["3mo", "6mo", "1y", "2y", "5y"] as const;
+// UI timeframe -> API range param.
+const RANGES: [string, string][] = [
+  ["1d", "1D"],
+  ["5d", "1W"],
+  ["1mo", "1M"],
+  ["3mo", "3M"],
+  ["6mo", "6M"],
+  ["1y", "1Y"],
+  ["5y", "5Y"],
+];
 
 export default function StockDetail() {
   const { ticker = "" } = useParams();
   const navigate = useNavigate();
-  const [range, setRange] = useState<string>("1y");
+  const [range, setRange] = useState<string>("1mo");
   const [tab, setTab] = useState<Tab>("risk");
   const [recovering, setRecovering] = useState(false);
 
   const { data, isLoading, isError } = useQuery<StockAnalysis>({
-    queryKey: ["stock", ticker, range],
-    queryFn: () => api.stock(ticker, range),
+    queryKey: ["stock", ticker],
+    queryFn: () => api.stock(ticker),
     retry: false,
+  });
+
+  // Chart bars are fetched separately and keyed by timeframe, so switching ranges
+  // only updates the chart (keepPreviousData = no flash) and never the whole page.
+  const chartQuery = useQuery({
+    queryKey: ["chart", ticker, range],
+    queryFn: () => api.chart(ticker, range),
+    placeholderData: keepPreviousData,
+    enabled: !!data,
   });
 
   // If the symbol isn't valid (e.g. someone navigated to /stock/APPLE), try to
@@ -90,28 +108,36 @@ export default function StockDetail() {
 
       <div className="bg-panel border border-edge rounded-lg p-4">
         <div className="flex justify-end gap-1 mb-2">
-          {RANGES.map((r) => (
+          {RANGES.map(([tf, label]) => (
             <button
-              key={r}
-              onClick={() => setRange(r)}
-              className={`text-xs px-2 py-1 rounded ${
-                range === r ? "bg-accent text-white" : "text-muted hover:bg-panel2"
+              key={tf}
+              onClick={() => setRange(tf)}
+              className={`text-xs px-2.5 py-1 rounded font-medium transition ${
+                range === tf ? "bg-accent text-white" : "text-muted hover:bg-panel2"
               }`}
             >
-              {r}
+              {label}
             </button>
           ))}
         </div>
-        <Suspense fallback={<div className="h-[360px] grid place-items-center text-muted text-sm">Loading chart…</div>}>
-          <PriceChart bars={data.ohlcv} />
-        </Suspense>
+        <div className={`relative transition-opacity ${chartQuery.isFetching ? "opacity-60" : ""}`}>
+          {(chartQuery.data?.bars?.length ?? 0) > 0 ? (
+            <Suspense fallback={<div className="h-[360px] grid place-items-center text-muted text-sm">Loading chart…</div>}>
+              <PriceChart bars={chartQuery.data!.bars} />
+            </Suspense>
+          ) : (
+            <div className="h-[360px] grid place-items-center text-muted text-sm">
+              {chartQuery.isFetching ? "Loading chart…" : "No price data for this range."}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex gap-1 border-b border-edge overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
         {([
           ["risk", "Risk & Return"],
           ["technical", "Technical"],
-          ["valuation", "Valuation"],
+          data.isEtf ? ["holdings", "Holdings"] : ["valuation", "Valuation"],
           ["factor", "Factor"],
         ] as [Tab, string][]).map(([key, label]) => (
           <button
@@ -192,6 +218,55 @@ export default function StockDetail() {
             <MetricCard label="Volatility" value={fmt.pct(data.risk.annualizedVolatility)} hint="low-vol proxy (lower=better)" />
           </div>
         </div>
+      )}
+
+      {tab === "holdings" && (
+        data.etf && (data.etf.holdings.length > 0 || data.etf.sectors.length > 0) ? (
+          <div className="grid md:grid-cols-2 gap-5">
+            <div>
+              <h3 className="text-sm font-semibold mb-3">Sector breakdown</h3>
+              {data.etf.sectors.length === 0 ? (
+                <div className="text-muted text-sm">Not available.</div>
+              ) : (
+                <div className="space-y-2">
+                  {data.etf.sectors.map((s) => (
+                    <div key={s.sector} className="text-xs">
+                      <div className="flex justify-between mb-0.5">
+                        <span className="text-ink">{s.sector}</span>
+                        <span className="text-muted tabular-nums">{fmt.pct(s.weight)}</span>
+                      </div>
+                      <div className="h-1.5 bg-panel2 rounded overflow-hidden">
+                        <div className="h-full bg-accent" style={{ width: `${Math.min(100, s.weight * 100)}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold mb-3">Top 10 holdings</h3>
+              {data.etf.holdings.length === 0 ? (
+                <div className="text-muted text-sm">Not available.</div>
+              ) : (
+                <div className="divide-y divide-edge/50">
+                  {data.etf.holdings.map((h) => (
+                    <div key={h.symbol} className="flex items-center justify-between py-2 text-sm">
+                      <span className="min-w-0">
+                        <Link to={`/stock/${h.symbol}`} className="text-accent font-semibold">{h.symbol}</Link>
+                        <span className="text-muted ml-2 text-xs truncate">{h.name}</span>
+                      </span>
+                      <span className="tabular-nums text-ink shrink-0">{fmt.pct(h.weight)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="text-muted text-sm bg-panel border border-edge rounded-lg p-4">
+            Holdings breakdown isn't available for this ETF right now.
+          </div>
+        )
       )}
 
       <div>

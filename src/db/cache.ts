@@ -50,4 +50,5 @@ export const TTL = {
   profile: 604800, // 7 d
   screen: 3600, // 1 h
   news: 3600, // 1 h
+  etf: 86400, // 24 h
 };

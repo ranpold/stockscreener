@@ -6,7 +6,9 @@ import { SP500 } from "./universe/sp500";
 import { watchlistRoutes } from "./routes/watchlists";
 import { authRoutes } from "./routes/auth";
 import { searchSymbols } from "./providers/search";
-import type { Range } from "./providers";
+import { data as dataProvider } from "./providers";
+
+const dataChart = (ticker: string, tf: string) => dataProvider.getChartBars(ticker, tf);
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -56,20 +58,32 @@ app.get("/api/search", (c) => {
   });
 });
 
-// Deep-dive analysis for one ticker.
+// Deep-dive analysis for one ticker. Analysis always uses ~1y daily data
+// (stats are meaningless on intraday); the chart timeframe is fetched separately.
 app.get("/api/stock/:ticker", (c) => {
   const ticker = c.req.param("ticker");
-  const range = (c.req.query("range") as Range) || "1y";
   return edgeCached(c, 600, async () => {
     const client = getDb(c.env);
     await ensureSchema(client);
     try {
-      const analysis = await buildStockAnalysis(client, c.env, ticker, range);
+      const analysis = await buildStockAnalysis(client, c.env, ticker);
       if (!analysis) return { status: 404, data: { error: "no data for ticker" } };
       return { status: 200, data: analysis };
     } catch (e) {
       return { status: 500, data: { error: String(e) } };
     }
+  });
+});
+
+// Chart bars for a UI timeframe (decoupled from analysis; intraday for short ranges).
+app.get("/api/chart/:ticker", (c) => {
+  const ticker = c.req.param("ticker");
+  const tf = c.req.query("range") || "1y";
+  const short = tf === "1d" || tf === "5d";
+  return edgeCached(c, short ? 300 : 1800, async () => {
+    const bars = await dataChart(ticker, tf);
+    if (!bars.length) return { status: 404, data: { error: "no data", bars: [] } };
+    return { status: 200, data: { bars } };
   });
 });
 

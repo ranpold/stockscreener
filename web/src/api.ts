@@ -128,8 +128,6 @@ export interface StockAnalysis {
   technical: TechnicalSnapshot;
   fundamental: FundamentalMetrics;
   recommendation: Recommendation;
-  news: NewsItem[];
-  etf: EtfBreakdown | null;
   historyYears: number;
 }
 
@@ -188,6 +186,14 @@ export const api = {
 
   earnings(): Promise<{ events: EarningsEvent[] }> {
     return getJson(`/api/earnings`);
+  },
+
+  news(ticker: string): Promise<{ news: NewsItem[] }> {
+    return getJson(`/api/news/${encodeURIComponent(ticker)}`);
+  },
+
+  etf(ticker: string): Promise<{ etf: EtfBreakdown | null }> {
+    return getJson(`/api/etf/${encodeURIComponent(ticker)}`);
   },
 
   search(q: string): Promise<{ results: SearchResult[] }> {

@@ -42,7 +42,23 @@ export default function StockDetail() {
     queryKey: ["chart", ticker, range],
     queryFn: () => api.chart(ticker, range),
     placeholderData: keepPreviousData,
+    enabled: !!ticker, // fetch in parallel with the analysis, not after it
+    retry: false,
+  });
+
+  // News + ETF holdings load separately (below the fold) so they don't slow the
+  // recommendation/stats first paint.
+  const newsQuery = useQuery({
+    queryKey: ["news", ticker],
+    queryFn: () => api.news(ticker),
     enabled: !!data,
+    retry: false,
+  });
+  const etfQuery = useQuery({
+    queryKey: ["etf", ticker],
+    queryFn: () => api.etf(ticker),
+    enabled: !!data && !!data.isEtf,
+    retry: false,
   });
 
   // If the symbol isn't valid (e.g. someone navigated to /stock/APPLE), try to
@@ -239,15 +255,17 @@ export default function StockDetail() {
       )}
 
       {tab === "holdings" && (
-        data.etf && (data.etf.holdings.length > 0 || data.etf.sectors.length > 0) ? (
+        etfQuery.isLoading ? (
+          <div className="text-muted text-sm py-6 text-center">Loading holdings…</div>
+        ) : etfQuery.data?.etf && (etfQuery.data.etf.holdings.length > 0 || etfQuery.data.etf.sectors.length > 0) ? (
           <div className="grid md:grid-cols-2 gap-5">
             <div>
               <h3 className="text-sm font-semibold mb-3">Sector breakdown</h3>
-              {data.etf.sectors.length === 0 ? (
+              {etfQuery.data.etf.sectors.length === 0 ? (
                 <div className="text-muted text-sm">Not available.</div>
               ) : (
                 <div className="space-y-2">
-                  {data.etf.sectors.map((s) => (
+                  {etfQuery.data.etf.sectors.map((s) => (
                     <div key={s.sector} className="text-xs">
                       <div className="flex justify-between mb-0.5">
                         <span className="text-ink">{s.sector}</span>
@@ -263,11 +281,11 @@ export default function StockDetail() {
             </div>
             <div>
               <h3 className="text-sm font-semibold mb-3">Top 10 holdings</h3>
-              {data.etf.holdings.length === 0 ? (
+              {etfQuery.data.etf.holdings.length === 0 ? (
                 <div className="text-muted text-sm">Not available.</div>
               ) : (
                 <div className="divide-y divide-edge/50">
-                  {data.etf.holdings.map((h) => (
+                  {etfQuery.data.etf.holdings.map((h) => (
                     <div key={h.symbol} className="flex items-center justify-between py-2 text-sm">
                       <span className="min-w-0">
                         <Link to={`/stock/${h.symbol}`} className="text-accent font-semibold">{h.symbol}</Link>
@@ -289,13 +307,15 @@ export default function StockDetail() {
 
       <div>
         <h2 className="text-lg font-bold mb-2">Latest news</h2>
-        {data.news.length === 0 ? (
+        {newsQuery.isLoading ? (
+          <div className="text-muted text-sm bg-panel border border-edge rounded-lg p-4">Loading news…</div>
+        ) : (newsQuery.data?.news?.length ?? 0) === 0 ? (
           <div className="text-muted text-sm bg-panel border border-edge rounded-lg p-4">
             No recent headlines found for {data.ticker}.
           </div>
         ) : (
           <div className="grid md:grid-cols-2 gap-3">
-            {data.news.map((n, i) => (
+            {newsQuery.data!.news.map((n, i) => (
               <a
                 key={i}
                 href={n.url}

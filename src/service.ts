@@ -5,8 +5,8 @@ import { riskMetrics, annualizedVolatility, dailyReturns, historyYears, type Ris
 import { technicalSnapshot, momentum, type TechnicalSnapshot } from "./quant/technical";
 import type { FundamentalMetrics, RawFundamentals } from "./quant/fundamental";
 import { recommend, type Recommendation } from "./quant/recommendation";
-import { companyNews, type NewsItem } from "./providers/news";
-import { getEtfBreakdown, type EtfBreakdown } from "./providers/yahooEtf";
+import { companyNews } from "./providers/news";
+import { getEtfBreakdown } from "./providers/yahooEtf";
 import { computeFactorScores, type FactorScores, type FactorInputs } from "./quant/factor";
 
 export interface Env extends ProviderEnv {
@@ -30,17 +30,8 @@ export interface StockAnalysis {
   technical: TechnicalSnapshot;
   fundamental: FundamentalMetrics;
   recommendation: Recommendation;
-  news: NewsItem[];
-  etf: EtfBreakdown | null;
   historyYears: number;
   raw: RawFundamentals | null;
-}
-
-async function getCloses(db: Client, ticker: string, range: Range): Promise<number[]> {
-  const bars = await cached(db, `ohlcv:${ticker}:${range}`, TTL.ohlcv, () =>
-    data.getOHLCV(ticker, range),
-  );
-  return bars.map((b) => b.close);
 }
 
 /** Full deep-dive analysis for one ticker. */
@@ -51,24 +42,22 @@ export async function buildStockAnalysis(
   range: Range = "1y",
 ): Promise<StockAnalysis | null> {
   const sym = ticker.toUpperCase();
-  const bars = await cached(db, `ohlcv:${sym}:${range}`, TTL.ohlcv, () =>
-    data.getOHLCV(sym, range),
-  );
-  if (!bars.length) return null;
-  const closes = bars.map((b) => b.close);
 
-  const [marketCloses, profile, quote, fundRes, news] = await Promise.all([
-    getCloses(db, MARKET_TICKER, range),
+  // Fire every critical dependency at once — no sequential waves. News and ETF
+  // holdings are deliberately NOT here; they're fetched separately (below the fold)
+  // so they don't gate the recommendation/stats first paint.
+  const [bars, marketBars, profile, quote, fundRes] = await Promise.all([
+    cached(db, `ohlcv:${sym}:${range}`, TTL.ohlcv, () => data.getOHLCV(sym, range)),
+    cached(db, `ohlcv:${MARKET_TICKER}:${range}`, TTL.ohlcv, () => data.getOHLCV(MARKET_TICKER, range)),
     cached(db, `profile:${sym}`, TTL.profile, () => data.getProfile(sym, env)),
     cached(db, `quote:${sym}`, TTL.quote, () => data.getQuote(sym)),
     cached(db, `fund:${sym}:full`, TTL.fundamentals, () => data.getFundamentals(sym, env, true)),
-    cached(db, `news:${sym}`, TTL.news, () => companyNews(sym, env.FINNHUB_API_KEY ?? "")),
   ]);
+  if (!bars.length) return null;
+  const closes = bars.map((b) => b.close);
+  const marketCloses = marketBars.map((b) => b.close);
 
   const isEtf = (quote?.instrumentType ?? "").toUpperCase() === "ETF";
-  const etf = isEtf
-    ? await cached(db, `etf:${sym}`, TTL.etf, () => getEtfBreakdown(sym))
-    : null;
   const risk = riskMetrics(closes, marketCloses);
   const technical = technicalSnapshot(closes);
   const f = fundRes.metrics;
@@ -105,11 +94,21 @@ export async function buildStockAnalysis(
     technical,
     fundamental: f,
     recommendation,
-    news,
-    etf,
     historyYears: historyYears(closes),
     raw: fundRes.raw,
   };
+}
+
+/** Latest news for a ticker (separate from analysis; below-the-fold). */
+export function getNews(db: Client, env: Env, ticker: string) {
+  const sym = ticker.toUpperCase();
+  return cached(db, `news:${sym}`, TTL.news, () => companyNews(sym, env.FINNHUB_API_KEY ?? ""));
+}
+
+/** ETF sector + holdings breakdown (separate; only the Holdings tab needs it). */
+export function getEtf(db: Client, ticker: string) {
+  const sym = ticker.toUpperCase();
+  return cached(db, `etf:${sym}`, TTL.etf, () => getEtfBreakdown(sym));
 }
 
 export interface ScreenRow {

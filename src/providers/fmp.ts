@@ -38,7 +38,19 @@ export async function fmpFundamentals(
   const sym = encodeURIComponent(ticker);
   const metrics: Partial<FundamentalMetrics> = {};
 
-  const km = await getJson(`${BASE}/key-metrics-ttm?symbol=${sym}&apikey=${apiKey}`);
+  // Run key-metrics in parallel with the (optional) statements batch — one wave.
+  const kmP = getJson(`${BASE}/key-metrics-ttm?symbol=${sym}&apikey=${apiKey}`);
+  const statementsP = full
+    ? Promise.all([
+        getJson(`${BASE}/ratios-ttm?symbol=${sym}&apikey=${apiKey}`),
+        getJson(`${BASE}/income-statement?symbol=${sym}&period=annual&limit=2&apikey=${apiKey}`),
+        getJson(`${BASE}/balance-sheet-statement?symbol=${sym}&period=annual&limit=2&apikey=${apiKey}`),
+        getJson(`${BASE}/cash-flow-statement?symbol=${sym}&period=annual&limit=2&apikey=${apiKey}`),
+        getJson(`${BASE}/profile?symbol=${sym}&apikey=${apiKey}`),
+      ])
+    : Promise.resolve<[any, any, any, any, any]>([null, null, null, null, null]);
+  const [km, [ratios, inc, bal, cf, profile]] = await Promise.all([kmP, statementsP]);
+
   const k = Array.isArray(km) ? km[0] : null;
   if (k) {
     if (n(k.returnOnEquityTTM) !== undefined) metrics.roe = k.returnOnEquityTTM;
@@ -49,13 +61,6 @@ export async function fmpFundamentals(
 
   let raw: RawFundamentals | null = null;
   if (full) {
-    const [ratios, inc, bal, cf, profile] = await Promise.all([
-      getJson(`${BASE}/ratios-ttm?symbol=${sym}&apikey=${apiKey}`),
-      getJson(`${BASE}/income-statement?symbol=${sym}&period=annual&limit=2&apikey=${apiKey}`),
-      getJson(`${BASE}/balance-sheet-statement?symbol=${sym}&period=annual&limit=2&apikey=${apiKey}`),
-      getJson(`${BASE}/cash-flow-statement?symbol=${sym}&period=annual&limit=2&apikey=${apiKey}`),
-      getJson(`${BASE}/profile?symbol=${sym}&apikey=${apiKey}`),
-    ]);
     const r = Array.isArray(ratios) ? ratios[0] : null;
     if (r) {
       if (n(r.priceToEarningsRatioTTM) !== undefined) metrics.pe = r.priceToEarningsRatioTTM;

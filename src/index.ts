@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { getDb, ensureSchema } from "./db/client";
-import { buildStockAnalysis, buildScreen, type Env, type ScreenFilters } from "./service";
+import { buildStockAnalysis, buildScreen, getNews, getEtf, type Env, type ScreenFilters } from "./service";
 import { SP500 } from "./universe/sp500";
 import { watchlistRoutes } from "./routes/watchlists";
 import { authRoutes } from "./routes/auth";
@@ -21,7 +21,7 @@ app.use("/api/*", cors());
  * Repeat views are served at the edge (~RTT) without recomputing or touching Turso.
  */
 // Bump when an API response shape changes so deploys don't serve stale cached JSON.
-const CACHE_VERSION = "5";
+const CACHE_VERSION = "6";
 
 async function edgeCached(
   c: { req: { url: string }; executionCtx: ExecutionContext },
@@ -86,6 +86,28 @@ app.get("/api/stock/:ticker", (c) => {
     } catch (e) {
       return { status: 500, data: { error: String(e) } };
     }
+  });
+});
+
+// News for a ticker (below-the-fold; off the analysis critical path).
+app.get("/api/news/:ticker", (c) => {
+  const ticker = c.req.param("ticker");
+  return edgeCached(c, 3600, async () => {
+    const client = getDb(c.env);
+    await ensureSchema(client);
+    const news = await getNews(client, c.env, ticker);
+    return { status: 200, data: { news } };
+  });
+});
+
+// ETF sector + holdings breakdown (only the Holdings tab needs it).
+app.get("/api/etf/:ticker", (c) => {
+  const ticker = c.req.param("ticker");
+  return edgeCached(c, 86400, async () => {
+    const client = getDb(c.env);
+    await ensureSchema(client);
+    const etf = await getEtf(client, ticker);
+    return { status: 200, data: { etf } };
   });
 });
 

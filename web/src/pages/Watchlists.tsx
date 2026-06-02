@@ -21,10 +21,19 @@ function SnapshotGrid({ tickers, onRemove }: { tickers: string[]; onRemove: (t: 
   if (tickers.length === 0) return <span className="text-muted text-xs">No tickers yet.</span>;
   if (isLoading) return <div className="text-muted text-sm">Loading snapshots…</div>;
   const byTicker = new Map((data?.snapshots ?? []).map((s) => [s.ticker, s]));
+  // Highest score first; tickers without data fall to the end.
+  const ordered = [...tickers].sort((a, b) => {
+    const sa = byTicker.get(a);
+    const sb = byTicker.get(b);
+    if (!sa && !sb) return 0;
+    if (!sa) return 1;
+    if (!sb) return -1;
+    return sb.score - sa.score;
+  });
 
   return (
     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-      {tickers.map((t) => {
+      {ordered.map((t) => {
         const s = byTicker.get(t);
         const up = (s?.changePercent ?? 0) >= 0;
         return (

@@ -13,16 +13,31 @@ const VERDICT_STYLE: Record<Snapshot["verdict"], string> = {
   Avoid: "bg-neg/20 text-neg",
 };
 
+function riskTier(v: number): { label: string; color: string } {
+  if (v < 0.25) return { label: "Low risk", color: "#16c784" };
+  if (v <= 0.45) return { label: "Med risk", color: "#f5a623" };
+  return { label: "High risk", color: "#ea3943" };
+}
+
 function IdeaCard({ s }: { s: Snapshot }) {
   const up = (s.changePercent ?? 0) >= 0;
+  const risk = riskTier(s.volatility);
   return (
     <Link
       to={`/stock/${s.ticker}`}
       className="block bg-panel2 border border-edge rounded-xl p-3 shadow-card card-hover"
     >
-      <div className="flex items-baseline gap-2">
-        <span className="font-bold text-accent">{s.ticker}</span>
-        {s.isEtf && <span className="text-[10px] bg-edge px-1 rounded text-muted">ETF</span>}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-baseline gap-2 min-w-0">
+          <span className="font-bold text-accent">{s.ticker}</span>
+          {s.isEtf && <span className="text-[10px] bg-edge px-1 rounded text-muted">ETF</span>}
+        </div>
+        <span
+          className="text-[10px] px-1.5 py-0.5 rounded font-semibold shrink-0"
+          style={{ background: `${risk.color}22`, color: risk.color }}
+        >
+          {risk.label}
+        </span>
       </div>
       <div className="text-[11px] text-muted truncate">{s.name}</div>
       <div className="flex items-baseline gap-2 mt-1.5">

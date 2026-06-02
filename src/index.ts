@@ -4,6 +4,7 @@ import { getDb, ensureSchema } from "./db/client";
 import { buildStockAnalysis, buildScreen, type Env, type ScreenFilters } from "./service";
 import { SP500 } from "./universe/sp500";
 import { watchlistRoutes } from "./routes/watchlists";
+import { authRoutes } from "./routes/auth";
 import { searchSymbols } from "./providers/search";
 import type { Range } from "./providers";
 
@@ -85,6 +86,7 @@ app.get("/api/screen", async (c) => {
   }
 });
 
+app.route("/api/auth", authRoutes);
 app.route("/api/watchlists", watchlistRoutes);
 
 // Static assets (Vite build) served by the ASSETS binding for everything else.

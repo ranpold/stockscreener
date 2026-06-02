@@ -12,6 +12,9 @@ export interface Env extends ProviderEnv {
   TURSO_URL: string;
   TURSO_AUTH_TOKEN: string;
   ASSETS: { fetch: typeof fetch };
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  SESSION_SECRET?: string;
 }
 
 const MARKET_TICKER = "SPY";

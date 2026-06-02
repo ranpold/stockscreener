@@ -26,6 +26,13 @@ export async function ensureSchema(db: Client): Promise<void> {
         payload TEXT NOT NULL,
         expires_at INTEGER NOT NULL
       )`,
+      `CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        name TEXT,
+        picture TEXT,
+        created_at INTEGER NOT NULL
+      )`,
       `CREATE TABLE IF NOT EXISTS watchlists (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -45,5 +52,11 @@ export async function ensureSchema(db: Client): Promise<void> {
     ],
     "write",
   );
+  // Add user ownership to watchlists (idempotent; ignore "duplicate column").
+  try {
+    await db.execute("ALTER TABLE watchlists ADD COLUMN user_id TEXT");
+  } catch {
+    // column already exists
+  }
   initialized = true;
 }

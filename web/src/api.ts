@@ -133,6 +133,13 @@ export interface ScreenFilters {
   maxBeta?: number;
 }
 
+export interface AuthUser {
+  sub: string;
+  email: string;
+  name?: string;
+  picture?: string;
+}
+
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
@@ -202,6 +209,14 @@ export const api = {
 
   async deleteWatchlist(id: string): Promise<void> {
     await fetch(`/api/watchlists/${id}`, { method: "DELETE" });
+  },
+
+  me(): Promise<{ user: AuthUser | null }> {
+    return getJson(`/api/auth/me`);
+  },
+
+  async logout(): Promise<void> {
+    await fetch(`/api/auth/logout`, { method: "POST" });
   },
 };
 

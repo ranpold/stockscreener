@@ -8,6 +8,14 @@ const VERDICT_STYLE: Record<Recommendation["verdict"], string> = {
   Avoid: "bg-neg/20 text-neg border-neg/40",
 };
 
+const VERDICT_MEANING: Record<Recommendation["verdict"], string> = {
+  "Strong Buy": "Signals are strongly favorable across the board — a high-conviction setup.",
+  Buy: "More working in its favor than against — leans favorable.",
+  Hold: "Mixed signals with no clear edge — fine to wait or keep watching.",
+  Reduce: "Signals lean negative — caution warranted.",
+  Avoid: "Mostly unfavorable signals — elevated risk right now.",
+};
+
 function scoreColor(s: number): string {
   if (s >= 62) return "text-pos";
   if (s >= 45) return "text-yellow-400";
@@ -46,7 +54,8 @@ export default function RecommendationPanel({ rec, isEtf }: { rec: Recommendatio
           <span className={`inline-block px-3 py-1 rounded-md border text-sm font-semibold ${VERDICT_STYLE[rec.verdict]}`}>
             {rec.verdict}
           </span>
-          <div className="text-xs text-muted mt-1">
+          <div className="text-xs text-ink mt-1.5 max-w-xs">{VERDICT_MEANING[rec.verdict]}</div>
+          <div className="text-[11px] text-muted mt-1">
             Composite quant signal {isEtf ? "(ETF: price & risk weighted)" : "(value · quality · momentum · trend · risk)"}
           </div>
         </div>

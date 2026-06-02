@@ -6,11 +6,16 @@ compatibility_flags = ["nodejs_compat"]
 # Custom domain (zone managed in this Cloudflare account). wrangler provisions
 # the DNS record + TLS cert automatically on deploy.
 routes = [
-  { pattern = "quantscreen.us", custom_domain = true },
-  { pattern = "www.quantscreen.us", custom_domain = true },
+  { pattern = "quantscreen.org", custom_domain = true },
+  { pattern = "www.quantscreen.org", custom_domain = true },
 ]
 # Keep the workers.dev URL working too (fallback / old links).
 workers_dev = true
+
+# Build the React frontend before deploy (runs in Cloudflare Workers Builds CI
+# and locally on `wrangler deploy`/`dev`), producing web/dist for the assets.
+[build]
+command = "npm run build:web"
 
 [assets]
 directory = "./web/dist"

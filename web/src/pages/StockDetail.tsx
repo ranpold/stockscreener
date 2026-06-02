@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api, fmt, type StockAnalysis } from "../api";
-import PriceChart from "../components/PriceChart";
 import MetricCard from "../components/MetricCard";
 import RecommendationPanel from "../components/RecommendationPanel";
+
+// Lazy-loaded so lightweight-charts isn't in the initial bundle.
+const PriceChart = lazy(() => import("../components/PriceChart"));
 
 type Tab = "risk" | "technical" | "valuation" | "factor";
 
@@ -100,7 +102,9 @@ export default function StockDetail() {
             </button>
           ))}
         </div>
-        <PriceChart bars={data.ohlcv} />
+        <Suspense fallback={<div className="h-[360px] grid place-items-center text-muted text-sm">Loading chart…</div>}>
+          <PriceChart bars={data.ohlcv} />
+        </Suspense>
       </div>
 
       <div className="flex gap-1 border-b border-edge overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">

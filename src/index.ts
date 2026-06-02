@@ -22,7 +22,7 @@ app.use("/api/*", cors());
  * Repeat views are served at the edge (~RTT) without recomputing or touching Turso.
  */
 // Bump when an API response shape changes so deploys don't serve stale cached JSON.
-const CACHE_VERSION = "12";
+const CACHE_VERSION = "13";
 
 async function edgeCached(
   c: { req: { url: string }; executionCtx: ExecutionContext },
